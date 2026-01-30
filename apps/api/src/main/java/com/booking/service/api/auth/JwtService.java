@@ -45,6 +45,18 @@ public class JwtService {
         return Long.valueOf(claims.getSubject());
     }
 
+    public boolean isValid(String token) {
+        try {
+            Jwts.parserBuilder()
+                    .setSigningKey(signingKey)
+                    .build()
+                    .parseClaimsJws(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private String buildToken(Long memberId, long validityMs) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + validityMs);

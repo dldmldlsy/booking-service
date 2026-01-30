@@ -1,15 +1,15 @@
 package com.booking.service.api.member;
 
 import com.booking.service.api.auth.JwtService;
+import com.booking.service.api.auth.RefreshTokenStore;
 import com.booking.service.api.common.ApiResponse;
 import com.booking.service.api.member.dto.LoginRequest;
 import com.booking.service.api.member.dto.MemberResponse;
+import com.booking.service.api.member.dto.RefreshRequest;
 import com.booking.service.api.member.dto.SignupRequest;
 import com.booking.service.api.member.dto.TokenResponse;
 import com.booking.service.api.member.dto.UpdateMemberRequest;
 import com.booking.service.domain.member.Member;
-import jakarta.servlet.http.HttpServletRequest;
-import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -30,10 +30,12 @@ public class AuthController {
 
     private final MemberService memberService;
     private final JwtService jwtService;
+    private final RefreshTokenStore refreshTokenStore;
 
-    public AuthController(MemberService memberService, JwtService jwtService) {
+    public AuthController(MemberService memberService, JwtService jwtService, RefreshTokenStore refreshTokenStore) {
         this.memberService = memberService;
         this.jwtService = jwtService;
+        this.refreshTokenStore = refreshTokenStore;
     }
 
     @PostMapping("/auth/signup")
@@ -52,7 +54,30 @@ public class AuthController {
         }
         String access = jwtService.generateAccessToken(member.getId());
         String refresh = jwtService.generateRefreshToken(member.getId());
+        refreshTokenStore.save(refresh, member.getId());
         return ApiResponse.ok(new TokenResponse(access, refresh));
+    }
+
+    @PostMapping("/auth/refresh")
+    public ApiResponse<TokenResponse> refresh(@RequestBody RefreshRequest request) {
+        String refreshToken = request.refreshToken();
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new IllegalArgumentException("refreshToken is required");
+        }
+        if (!jwtService.isValid(refreshToken)) {
+            throw new IllegalArgumentException("invalid refresh token");
+        }
+        Long memberId = refreshTokenStore.findMemberId(refreshToken)
+                .orElseThrow(() -> new IllegalArgumentException("refresh token not recognized"));
+
+        Long tokenSubject = jwtService.parseMemberId(refreshToken);
+        if (!memberId.equals(tokenSubject)) {
+            throw new IllegalArgumentException("refresh token owner mismatch");
+        }
+        String newAccess = jwtService.generateAccessToken(memberId);
+        String newRefresh = jwtService.generateRefreshToken(memberId);
+        refreshTokenStore.replace(refreshToken, newRefresh, memberId);
+        return ApiResponse.ok(new TokenResponse(newAccess, newRefresh));
     }
 
     @GetMapping("/members/me")
@@ -82,6 +107,9 @@ public class AuthController {
             throw new IllegalArgumentException("Authorization header missing or invalid");
         }
         String token = authorizationHeader.substring("Bearer ".length());
+        if (!jwtService.isValid(token)) {
+            throw new IllegalArgumentException("invalid access token");
+        }
         return jwtService.parseMemberId(token);
     }
 }

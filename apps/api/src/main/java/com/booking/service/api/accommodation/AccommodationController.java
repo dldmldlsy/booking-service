@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.booking.service.api.common.ApiResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,13 +27,14 @@ public class AccommodationController {
     }
 
     @GetMapping
-    public List<AccommodationResponse> list() {
+    public ApiResponse<List<AccommodationResponse>> list() {
         Map<Long, List<Availability>> availabilityByRoom = accommodationService.getAvailabilityByRoom();
-        return accommodationService.getAccommodations().stream()
+        List<AccommodationResponse> data = accommodationService.getAccommodations().stream()
                 .map(acc -> toResponse(acc,
                         accommodationService.getRoomsByAccommodation(acc.getId()),
                         availabilityByRoom))
                 .toList();
+        return ApiResponse.ok(data);
     }
 
     private AccommodationResponse toResponse(Accommodation acc, List<Room> rooms, Map<Long, List<Availability>> availabilityByRoom) {

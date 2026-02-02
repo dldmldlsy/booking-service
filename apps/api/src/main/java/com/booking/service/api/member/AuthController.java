@@ -1,5 +1,6 @@
 package com.booking.service.api.member;
 
+import com.booking.service.api.auth.BlacklistStore;
 import com.booking.service.api.auth.JwtService;
 import com.booking.service.api.auth.RefreshTokenStore;
 import com.booking.service.api.common.ApiResponse;
@@ -31,11 +32,16 @@ public class AuthController {
     private final MemberService memberService;
     private final JwtService jwtService;
     private final RefreshTokenStore refreshTokenStore;
+    private final BlacklistStore blacklistStore;
 
-    public AuthController(MemberService memberService, JwtService jwtService, RefreshTokenStore refreshTokenStore) {
+    public AuthController(MemberService memberService,
+                          JwtService jwtService,
+                          RefreshTokenStore refreshTokenStore,
+                          BlacklistStore blacklistStore) {
         this.memberService = memberService;
         this.jwtService = jwtService;
         this.refreshTokenStore = refreshTokenStore;
+        this.blacklistStore = blacklistStore;
     }
 
     @PostMapping("/auth/signup")
@@ -74,10 +80,29 @@ public class AuthController {
         if (!meta.memberId().equals(tokenSubject)) {
             throw new IllegalArgumentException("refresh token owner mismatch");
         }
+        // 기존 리프레시 토큰 무효화 및 블랙리스트 등록
+        refreshTokenStore.delete(refreshToken);
+        blacklistStore.blacklist(refreshToken, meta.expiresAt());
+
         String newAccess = jwtService.generateAccessToken(meta.memberId());
         String newRefresh = jwtService.generateRefreshToken(meta.memberId());
-        refreshTokenStore.replace(refreshToken, newRefresh, meta.memberId(), jwtService.getExpiration(newRefresh));
+        refreshTokenStore.save(newRefresh, meta.memberId(), jwtService.getExpiration(newRefresh));
         return ApiResponse.ok(new TokenResponse(newAccess, newRefresh));
+    }
+
+    @PostMapping("/auth/logout")
+    public ApiResponse<Void> logout(@RequestHeader("Authorization") String authorization,
+                                    @RequestBody RefreshRequest request) {
+        String accessToken = extractToken(authorization);
+        if (jwtService.isValid(accessToken)) {
+            blacklistStore.blacklist(accessToken, jwtService.getExpiration(accessToken));
+        }
+        String refreshToken = request.refreshToken();
+        if (refreshToken != null && !refreshToken.isBlank() && jwtService.isValid(refreshToken)) {
+            blacklistStore.blacklist(refreshToken, jwtService.getExpiration(refreshToken));
+            refreshTokenStore.delete(refreshToken);
+        }
+        return ApiResponse.ok(null);
     }
 
     @GetMapping("/members/me")
@@ -103,13 +128,17 @@ public class AuthController {
     }
 
     private Long resolveMemberId(String authorizationHeader) {
-        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-            throw new IllegalArgumentException("Authorization header missing or invalid");
-        }
-        String token = authorizationHeader.substring("Bearer ".length());
+        String token = extractToken(authorizationHeader);
         if (!jwtService.isValid(token)) {
             throw new IllegalArgumentException("invalid access token");
         }
         return jwtService.parseMemberId(token);
+    }
+
+    private String extractToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("Authorization header missing or invalid");
+        }
+        return authorizationHeader.substring("Bearer ".length());
     }
 }

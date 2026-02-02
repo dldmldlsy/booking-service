@@ -32,4 +32,8 @@ public class RefreshTokenStore {
     }
 
     public record TokenMeta(Long memberId, Instant expiresAt) {}
+
+    public void cleanupExpired(Instant now) {
+        store.entrySet().removeIf(e -> e.getValue().expiresAt().isBefore(now));
+    }
 }

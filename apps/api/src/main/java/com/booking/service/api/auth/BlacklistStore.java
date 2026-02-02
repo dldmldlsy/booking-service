@@ -29,4 +29,8 @@ public class BlacklistStore {
         }
         return true;
     }
+
+    public void cleanupExpired(Instant now) {
+        blacklist.entrySet().removeIf(e -> e.getValue().isBefore(now));
+    }
 }

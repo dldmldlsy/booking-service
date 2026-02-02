@@ -54,7 +54,7 @@ public class AuthController {
         }
         String access = jwtService.generateAccessToken(member.getId());
         String refresh = jwtService.generateRefreshToken(member.getId());
-        refreshTokenStore.save(refresh, member.getId());
+        refreshTokenStore.save(refresh, member.getId(), jwtService.getExpiration(refresh));
         return ApiResponse.ok(new TokenResponse(access, refresh));
     }
 
@@ -67,16 +67,16 @@ public class AuthController {
         if (!jwtService.isValid(refreshToken)) {
             throw new IllegalArgumentException("invalid refresh token");
         }
-        Long memberId = refreshTokenStore.findMemberId(refreshToken)
+        RefreshTokenStore.TokenMeta meta = refreshTokenStore.find(refreshToken)
                 .orElseThrow(() -> new IllegalArgumentException("refresh token not recognized"));
 
         Long tokenSubject = jwtService.parseMemberId(refreshToken);
-        if (!memberId.equals(tokenSubject)) {
+        if (!meta.memberId().equals(tokenSubject)) {
             throw new IllegalArgumentException("refresh token owner mismatch");
         }
-        String newAccess = jwtService.generateAccessToken(memberId);
-        String newRefresh = jwtService.generateRefreshToken(memberId);
-        refreshTokenStore.replace(refreshToken, newRefresh, memberId);
+        String newAccess = jwtService.generateAccessToken(meta.memberId());
+        String newRefresh = jwtService.generateRefreshToken(meta.memberId());
+        refreshTokenStore.replace(refreshToken, newRefresh, meta.memberId(), jwtService.getExpiration(newRefresh));
         return ApiResponse.ok(new TokenResponse(newAccess, newRefresh));
     }
 

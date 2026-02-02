@@ -5,6 +5,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.time.Instant;
 import java.util.Date;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,15 @@ public class JwtService {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public Instant getExpiration(String token) {
+        var claims = Jwts.parserBuilder()
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.getExpiration().toInstant();
     }
 
     private String buildToken(Long memberId, long validityMs) {

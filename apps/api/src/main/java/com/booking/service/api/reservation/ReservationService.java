@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
@@ -50,6 +51,38 @@ public class ReservationService {
         );
         reservations.put(id, reservation);
         return reservation;
+    }
+
+    public Reservation findById(Long id) {
+        return Optional.ofNullable(reservations.get(id))
+                .orElseThrow(() -> new IllegalArgumentException("reservation not found: " + id));
+    }
+
+    public Reservation cancel(Long id) {
+        Reservation existing = findById(id);
+        if (existing.getStatus() == ReservationStatus.CANCELED) {
+            throw new IllegalStateException("reservation already canceled");
+        }
+        accommodationService.releaseAvailability(existing.getRoomId(), existing.getCheckInDate(), existing.getCheckOutDate());
+        Reservation canceled = new Reservation(
+                existing.getId(),
+                existing.getMemberId(),
+                existing.getRoomId(),
+                existing.getCheckInDate(),
+                existing.getCheckOutDate(),
+                ReservationStatus.CANCELED,
+                existing.getCreatedAt()
+        );
+        reservations.put(id, canceled);
+        return canceled;
+    }
+
+    public void delete(Long id) {
+        Reservation existing = findById(id);
+        if (existing.getStatus() == ReservationStatus.RESERVED) {
+            accommodationService.releaseAvailability(existing.getRoomId(), existing.getCheckInDate(), existing.getCheckOutDate());
+        }
+        reservations.remove(id);
     }
 
     public List<Reservation> findAll() {

@@ -6,8 +6,11 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,9 +35,25 @@ public class ReservationController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(created));
     }
 
+    @GetMapping("/{id}")
+    public ApiResponse<Reservation> getById(@PathVariable Long id) {
+        return ApiResponse.ok(reservationService.findById(id));
+    }
+
     @GetMapping
     public ApiResponse<List<Reservation>> list() {
         return ApiResponse.ok(reservationService.findAll());
+    }
+
+    @PatchMapping("/{id}/cancel")
+    public ApiResponse<Reservation> cancel(@PathVariable Long id) {
+        return ApiResponse.ok(reservationService.cancel(id));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        reservationService.delete(id);
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})

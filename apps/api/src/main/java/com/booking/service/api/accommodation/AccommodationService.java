@@ -122,6 +122,15 @@ public class AccommodationService {
                         .ifPresent(Availability::decrement));
     }
 
+    /**
+     * 예약 취소 시 재고를 복원한다.
+     */
+    public void releaseAvailability(Long roomId, LocalDate checkIn, LocalDate checkOut) {
+        iterateDates(checkIn, checkOut)
+                .forEach(date -> availabilityFor(roomId, date)
+                        .ifPresent(Availability::increment));
+    }
+
     private Optional<Availability> availabilityFor(Long roomId, LocalDate date) {
         return availabilityByRoom.getOrDefault(roomId, List.of())
                 .stream()

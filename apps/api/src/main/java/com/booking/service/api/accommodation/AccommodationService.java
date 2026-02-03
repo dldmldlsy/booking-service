@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.springframework.stereotype.Service;
 
@@ -25,9 +26,15 @@ public class AccommodationService {
     private final Map<Long, Accommodation> accommodations = new HashMap<>();
     private final Map<Long, Room> rooms = new HashMap<>();
     private final Map<Long, List<Availability>> availabilityByRoom = new HashMap<>();
+    private final AtomicLong accommodationSeq = new AtomicLong(1);
 
     public AccommodationService() {
         seedSampleData();
+        long nextId = accommodations.keySet().stream()
+                .mapToLong(Long::longValue)
+                .max()
+                .orElse(0L) + 1;
+        accommodationSeq.set(nextId);
     }
 
     public List<Accommodation> getAccommodations() {
@@ -46,6 +53,35 @@ public class AccommodationService {
 
     public Optional<Room> findRoom(Long roomId) {
         return Optional.ofNullable(rooms.get(roomId));
+    }
+
+    public Accommodation createAccommodation(CreateAccommodationRequest request) {
+        Objects.requireNonNull(request, "request is required");
+        if (request.name() == null || request.name().isBlank()) {
+            throw new IllegalArgumentException("name is required");
+        }
+        if (request.address() == null || request.address().isBlank()) {
+            throw new IllegalArgumentException("address is required");
+        }
+        Long id = accommodationSeq.getAndIncrement();
+        Accommodation accommodation = new Accommodation(id, request.name(), request.address(), request.description());
+        accommodations.put(id, accommodation);
+        return accommodation;
+    }
+
+    public void deleteAccommodation(Long accommodationId) {
+        Accommodation removed = accommodations.remove(accommodationId);
+        if (removed == null) {
+            throw new IllegalArgumentException("accommodation not found: " + accommodationId);
+        }
+        // Remove rooms and related availability for this accommodation
+        rooms.entrySet().removeIf(entry -> {
+            if (entry.getValue().getAccommodationId().equals(accommodationId)) {
+                availabilityByRoom.remove(entry.getKey());
+                return true;
+            }
+            return false;
+        });
     }
 
     /**
@@ -109,5 +145,8 @@ public class AccommodationService {
         }
         long days = java.time.temporal.ChronoUnit.DAYS.between(start, endExclusive);
         return java.util.stream.Stream.iterate(start, d -> d.plusDays(1)).limit(days);
+    }
+
+    public record CreateAccommodationRequest(String name, String address, String description) {
     }
 }

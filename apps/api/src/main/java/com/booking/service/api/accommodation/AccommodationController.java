@@ -9,7 +9,13 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.booking.service.api.common.ApiResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,6 +41,22 @@ public class AccommodationController {
                         availabilityByRoom))
                 .toList();
         return ApiResponse.ok(data);
+    }
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<AccommodationResponse>> create(@RequestBody AccommodationService.CreateAccommodationRequest request) {
+        var created = accommodationService.createAccommodation(request);
+        Map<Long, List<Availability>> availabilityByRoom = accommodationService.getAvailabilityByRoom();
+        AccommodationResponse response = toResponse(created,
+                accommodationService.getRoomsByAccommodation(created.getId()),
+                availabilityByRoom);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
+    }
+
+    @DeleteMapping("/{accommodationId}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long accommodationId) {
+        accommodationService.deleteAccommodation(accommodationId);
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
     private AccommodationResponse toResponse(Accommodation acc, List<Room> rooms, Map<Long, List<Availability>> availabilityByRoom) {

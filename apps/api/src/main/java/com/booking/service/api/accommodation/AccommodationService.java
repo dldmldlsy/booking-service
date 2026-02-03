@@ -27,6 +27,8 @@ public class AccommodationService {
     private final Map<Long, Room> rooms = new HashMap<>();
     private final Map<Long, List<Availability>> availabilityByRoom = new HashMap<>();
     private final AtomicLong accommodationSeq = new AtomicLong(1);
+    private final AtomicLong roomSeq = new AtomicLong(1);
+    private final AtomicLong availabilitySeq = new AtomicLong(1);
 
     public AccommodationService() {
         seedSampleData();
@@ -35,6 +37,19 @@ public class AccommodationService {
                 .max()
                 .orElse(0L) + 1;
         accommodationSeq.set(nextId);
+
+        long nextRoomId = rooms.keySet().stream()
+                .mapToLong(Long::longValue)
+                .max()
+                .orElse(0L) + 1;
+        roomSeq.set(nextRoomId);
+
+        long nextAvailabilityId = availabilityByRoom.values().stream()
+                .flatMap(List::stream)
+                .mapToLong(Availability::getId)
+                .max()
+                .orElse(0L) + 1;
+        availabilitySeq.set(nextAvailabilityId);
     }
 
     public List<Accommodation> getAccommodations() {
@@ -66,6 +81,10 @@ public class AccommodationService {
         Long id = accommodationSeq.getAndIncrement();
         Accommodation accommodation = new Accommodation(id, request.name(), request.address(), request.description());
         accommodations.put(id, accommodation);
+
+        if (request.rooms() != null) {
+            request.rooms().forEach(roomRequest -> createRoom(id, roomRequest));
+        }
         return accommodation;
     }
 
@@ -147,6 +166,43 @@ public class AccommodationService {
         return java.util.stream.Stream.iterate(start, d -> d.plusDays(1)).limit(days);
     }
 
-    public record CreateAccommodationRequest(String name, String address, String description) {
+    private Room createRoom(Long accommodationId, CreateRoomRequest request) {
+        Objects.requireNonNull(request, "room request is required");
+        if (request.name() == null || request.name().isBlank()) {
+            throw new IllegalArgumentException("room name is required");
+        }
+        if (request.capacity() <= 0) {
+            throw new IllegalArgumentException("capacity must be positive");
+        }
+        if (request.basePrice() < 0) {
+            throw new IllegalArgumentException("basePrice must be >= 0");
+        }
+        Long roomId = roomSeq.getAndIncrement();
+        Room room = new Room(roomId, accommodationId, request.name(), request.capacity(), BigDecimal.valueOf(request.basePrice()));
+        rooms.put(roomId, room);
+
+        Map<LocalDate, Integer> availabilityByDate = request.availabilityByDate() == null
+                ? Map.of()
+                : request.availabilityByDate();
+        List<Availability> availabilityList = availabilityByRoom.computeIfAbsent(roomId, k -> new ArrayList<>());
+        availabilityByDate.forEach((date, count) -> {
+            if (date == null) {
+                throw new IllegalArgumentException("availability date is required");
+            }
+            if (count == null || count < 0) {
+                throw new IllegalArgumentException("availability count must be >= 0");
+            }
+            Long availabilityId = availabilitySeq.getAndIncrement();
+            availabilityList.add(new Availability(availabilityId, roomId, date, count));
+        });
+        return room;
+    }
+
+    public record CreateAccommodationRequest(String name, String address, String description,
+                                             List<CreateRoomRequest> rooms) {
+    }
+
+    public record CreateRoomRequest(String name, int capacity, long basePrice,
+                                    Map<LocalDate, Integer> availabilityByDate) {
     }
 }

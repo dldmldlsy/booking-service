@@ -13,7 +13,6 @@ import com.booking.service.api.member.dto.UpdateMemberRequest;
 import com.booking.service.domain.member.Member;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -21,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 /**
  * 회원 가입/로그인/프로필 조회/수정 API (Spring Security 미사용, 인메모리 저장).
@@ -45,14 +45,14 @@ public class AuthController {
     }
 
     @PostMapping("/auth/signup")
-    public ResponseEntity<ApiResponse<MemberResponse>> signup(@RequestBody SignupRequest request) {
+    public ResponseEntity<ApiResponse<MemberResponse>> signup(@Valid @RequestBody SignupRequest request) {
         Member member = memberService.register(request.email(), request.nickname(), request.password());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(MemberResponse.from(member)));
     }
 
     @PostMapping("/auth/login")
-    public ApiResponse<TokenResponse> login(@RequestBody LoginRequest request) {
+    public ApiResponse<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
         Member member = memberService.findByEmail(request.email())
                 .orElseThrow(() -> new IllegalArgumentException("invalid credentials"));
         if (!memberService.matchesPassword(member, request.password())) {
@@ -65,7 +65,7 @@ public class AuthController {
     }
 
     @PostMapping("/auth/refresh")
-    public ApiResponse<TokenResponse> refresh(@RequestBody RefreshRequest request) {
+    public ApiResponse<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         String refreshToken = request.refreshToken();
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new IllegalArgumentException("refreshToken is required");
@@ -92,7 +92,7 @@ public class AuthController {
 
     @PostMapping("/auth/logout")
     public ApiResponse<Void> logout(@RequestHeader("Authorization") String authorization,
-                                    @RequestBody RefreshRequest request) {
+                                    @Valid @RequestBody RefreshRequest request) {
         String accessToken = extractToken(authorization);
         if (jwtService.isValid(accessToken)) {
             blacklistStore.blacklist(accessToken, jwtService.getExpiration(accessToken));
@@ -115,16 +115,10 @@ public class AuthController {
 
     @PutMapping("/members/me")
     public ApiResponse<MemberResponse> update(@RequestHeader("Authorization") String authorization,
-                                              @RequestBody UpdateMemberRequest request) {
+                                              @Valid @RequestBody UpdateMemberRequest request) {
         Long memberId = resolveMemberId(authorization);
         Member updated = memberService.updateProfile(memberId, request.nickname());
         return ApiResponse.ok(MemberResponse.from(updated));
-    }
-
-    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
-    public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getMessage()));
     }
 
     private Long resolveMemberId(String authorizationHeader) {

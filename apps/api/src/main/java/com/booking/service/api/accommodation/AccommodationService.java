@@ -16,6 +16,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 
 /**
  * 인메모리 숙소/객실/재고 데이터를 관리하는 서비스.
@@ -76,7 +80,7 @@ public class AccommodationService {
         return Optional.ofNullable(rooms.get(roomId));
     }
 
-    public Accommodation createAccommodation(CreateAccommodationRequest request) {
+    public Accommodation createAccommodation(@Valid CreateAccommodationRequest request) {
         Objects.requireNonNull(request, "request is required");
         if (request.name() == null || request.name().isBlank()) {
             throw new IllegalArgumentException("name is required");
@@ -201,15 +205,6 @@ public class AccommodationService {
 
     private Room createRoom(Long accommodationId, CreateRoomRequest request) {
         Objects.requireNonNull(request, "room request is required");
-        if (request.name() == null || request.name().isBlank()) {
-            throw new IllegalArgumentException("room name is required");
-        }
-        if (request.capacity() <= 0) {
-            throw new IllegalArgumentException("capacity must be positive");
-        }
-        if (request.basePrice() < 0) {
-            throw new IllegalArgumentException("basePrice must be >= 0");
-        }
         Long roomId = roomSeq.getAndIncrement();
         Room room = new Room(roomId, accommodationId, request.name(), request.capacity(), BigDecimal.valueOf(request.basePrice()));
         rooms.put(roomId, room);
@@ -231,11 +226,17 @@ public class AccommodationService {
         return room;
     }
 
-    public record CreateAccommodationRequest(String name, String address, String description,
-                                             List<CreateRoomRequest> rooms) {
+    public record CreateAccommodationRequest(
+            @NotBlank String name,
+            @NotBlank String address,
+            String description,
+            @Valid List<CreateRoomRequest> rooms) {
     }
 
-    public record CreateRoomRequest(String name, int capacity, long basePrice,
-                                    Map<LocalDate, Integer> availabilityByDate) {
+    public record CreateRoomRequest(
+            @NotBlank String name,
+            @Positive int capacity,
+            @PositiveOrZero long basePrice,
+            Map<LocalDate, Integer> availabilityByDate) {
     }
 }

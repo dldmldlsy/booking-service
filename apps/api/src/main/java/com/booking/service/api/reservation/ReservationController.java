@@ -7,7 +7,6 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -15,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 /**
  * 예약 생성/조회에 대한 최소 API.
@@ -30,7 +30,7 @@ public class ReservationController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Reservation>> create(@RequestBody ReservationService.CreateReservationRequest request) {
+    public ResponseEntity<ApiResponse<Reservation>> create(@Valid @RequestBody ReservationService.CreateReservationRequest request) {
         Reservation created = reservationService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(created));
     }
@@ -56,9 +56,4 @@ public class ReservationController {
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
-    public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getMessage()));
-    }
 }

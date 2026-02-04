@@ -13,6 +13,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
+import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.FutureOrPresent;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 인메모리 예약 서비스. 재고 확인 후 예약을 생성하고 보관한다.
@@ -98,6 +101,10 @@ public class ReservationService {
         }
     }
 
-    public record CreateReservationRequest(Long memberId, Long roomId, LocalDate checkInDate, LocalDate checkOutDate) {
+    public record CreateReservationRequest(
+            @NotNull Long memberId,
+            @NotNull Long roomId,
+            @FutureOrPresent LocalDate checkInDate,
+            @Future LocalDate checkOutDate) {
     }
 }

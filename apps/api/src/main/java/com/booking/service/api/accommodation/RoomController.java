@@ -4,9 +4,6 @@ import com.booking.service.api.common.ApiResponse;
 import java.time.LocalDate;
 import java.util.Map;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,11 +32,5 @@ public class RoomController {
                                                              @RequestParam LocalDate from,
                                                              @RequestParam LocalDate to) {
         return ApiResponse.ok(accommodationService.getAvailability(roomId, from, to));
-    }
-
-    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
-    public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getMessage()));
     }
 }

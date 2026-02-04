@@ -12,13 +12,13 @@ import com.booking.service.api.common.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 /**
  * 숙소/객실/재고를 조회하는 최소 API.
@@ -56,7 +56,7 @@ public class AccommodationController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<AccommodationResponse>> create(@RequestBody AccommodationService.CreateAccommodationRequest request) {
+    public ResponseEntity<ApiResponse<AccommodationResponse>> create(@Valid @RequestBody AccommodationService.CreateAccommodationRequest request) {
         var created = accommodationService.createAccommodation(request);
         Map<Long, List<Availability>> availabilityByRoom = accommodationService.getAvailabilityByRoom();
         AccommodationResponse response = toResponse(created,
@@ -69,12 +69,6 @@ public class AccommodationController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long accommodationId) {
         accommodationService.deleteAccommodation(accommodationId);
         return ResponseEntity.ok(ApiResponse.ok(null));
-    }
-
-    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
-    public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getMessage()));
     }
 
     private AccommodationResponse toResponse(Accommodation acc, List<Room> rooms, Map<Long, List<Availability>> availabilityByRoom) {

@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -54,6 +55,11 @@ public class AccommodationService {
 
     public List<Accommodation> getAccommodations() {
         return new ArrayList<>(accommodations.values());
+    }
+
+    public Accommodation getAccommodation(Long accommodationId) {
+        return Optional.ofNullable(accommodations.get(accommodationId))
+                .orElseThrow(() -> new IllegalArgumentException("accommodation not found: " + accommodationId));
     }
 
     public List<Room> getRoomsByAccommodation(Long accommodationId) {
@@ -129,6 +135,24 @@ public class AccommodationService {
         iterateDates(checkIn, checkOut)
                 .forEach(date -> availabilityFor(roomId, date)
                         .ifPresent(Availability::increment));
+    }
+
+    /**
+     * 지정한 방의 재고를 날짜 범위(from 이상, to 미만)로 필터링하여 반환한다.
+     */
+    public Map<LocalDate, Integer> getAvailability(Long roomId, LocalDate from, LocalDate to) {
+        if (from == null || to == null) {
+            throw new IllegalArgumentException("from/to date is required");
+        }
+        if (!from.isBefore(to)) {
+            throw new IllegalArgumentException("from must be before to");
+        }
+        // room 존재 확인
+        findRoom(roomId).orElseThrow(() -> new IllegalArgumentException("room not found: " + roomId));
+
+        return availabilityByRoom.getOrDefault(roomId, List.of()).stream()
+                .filter(av -> !av.getDate().isBefore(from) && av.getDate().isBefore(to))
+                .collect(Collectors.toMap(Availability::getDate, Availability::getAvailableCount));
     }
 
     private Optional<Availability> availabilityFor(Long roomId, LocalDate date) {

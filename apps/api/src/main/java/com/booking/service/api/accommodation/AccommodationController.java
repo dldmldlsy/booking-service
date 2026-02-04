@@ -33,6 +33,17 @@ public class AccommodationController {
         this.accommodationService = accommodationService;
     }
 
+    @GetMapping("/{id}")
+    public ApiResponse<AccommodationResponse> getById(@PathVariable Long id) {
+        Map<Long, List<Availability>> availabilityByRoom = accommodationService.getAvailabilityByRoom();
+        var acc = accommodationService.getAccommodation(id);
+        return ApiResponse.ok(
+                toResponse(acc,
+                        accommodationService.getRoomsByAccommodation(acc.getId()),
+                        availabilityByRoom)
+        );
+    }
+
     @GetMapping
     public ApiResponse<List<AccommodationResponse>> list() {
         Map<Long, List<Availability>> availabilityByRoom = accommodationService.getAvailabilityByRoom();

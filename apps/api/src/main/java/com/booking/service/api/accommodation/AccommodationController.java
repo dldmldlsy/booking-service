@@ -9,8 +9,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.booking.service.api.common.ApiResponse;
+import com.booking.service.api.host.HostProfileService;
+import com.booking.service.domain.host.HostProfile;
+import com.booking.service.domain.member.Member;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,9 +32,12 @@ import jakarta.validation.Valid;
 public class AccommodationController {
 
     private final AccommodationService accommodationService;
+    private final HostProfileService hostProfileService;
 
-    public AccommodationController(AccommodationService accommodationService) {
+    public AccommodationController(AccommodationService accommodationService,
+                                   HostProfileService hostProfileService) {
         this.accommodationService = accommodationService;
+        this.hostProfileService = hostProfileService;
     }
 
     @GetMapping("/{id}")
@@ -56,7 +63,15 @@ public class AccommodationController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<AccommodationResponse>> create(@Valid @RequestBody AccommodationService.CreateAccommodationRequest request) {
+    public ResponseEntity<ApiResponse<AccommodationResponse>> create(@Valid @RequestBody AccommodationService.CreateAccommodationRequest request,
+                                                                     Authentication authentication) {
+        Member host = (Member) authentication.getPrincipal();
+        HostProfile profile = hostProfileService.findByMemberId(host.getId())
+                .orElseThrow(() -> new IllegalStateException("host profile not found"));
+        if (profile.getStatus() != HostProfile.Status.APPROVED) {
+            throw new IllegalStateException("host profile is not approved");
+        }
+
         var created = accommodationService.createAccommodation(request);
         Map<Long, List<Availability>> availabilityByRoom = accommodationService.getAvailabilityByRoom();
         AccommodationResponse response = toResponse(created,

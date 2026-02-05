@@ -10,12 +10,14 @@ public class Member {
     private final String email;
     private final String nickname;
     private final String passwordHash;
+    private final Role role;
 
-    public Member(Long id, String email, String nickname, String passwordHash) {
+    public Member(Long id, String email, String nickname, String passwordHash, Role role) {
         this.id = Objects.requireNonNull(id, "id is required");
         this.email = Objects.requireNonNull(email, "email is required");
         this.nickname = Objects.requireNonNull(nickname, "nickname is required");
         this.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash is required");
+        this.role = Objects.requireNonNull(role, "role is required");
     }
 
     public Long getId() {
@@ -32,5 +34,13 @@ public class Member {
 
     public String getPasswordHash() {
         return passwordHash;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public enum Role {
+        USER, HOST, ADMIN
     }
 }

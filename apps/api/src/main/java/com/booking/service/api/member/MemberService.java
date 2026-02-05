@@ -27,7 +27,7 @@ public class MemberService {
         }
         Long id = seq.getAndIncrement();
         String hash = BCrypt.hashpw(rawPassword, BCrypt.gensalt());
-        Member member = new Member(id, email, nickname, hash);
+        Member member = new Member(id, email, nickname, hash, Member.Role.USER);
         members.put(id, member);
         return member;
     }
@@ -46,12 +46,20 @@ public class MemberService {
         Member existing = members.get(id);
         if (existing == null) throw new IllegalArgumentException("member not found");
         String newNickname = nickname == null || nickname.isBlank() ? existing.getNickname() : nickname;
-        Member updated = new Member(existing.getId(), existing.getEmail(), newNickname, existing.getPasswordHash());
+        Member updated = new Member(existing.getId(), existing.getEmail(), newNickname, existing.getPasswordHash(), existing.getRole());
         members.put(id, updated);
         return updated;
     }
 
     public boolean matchesPassword(Member member, String rawPassword) {
         return BCrypt.checkpw(rawPassword, member.getPasswordHash());
+    }
+
+    public Member changeRole(Long memberId, Member.Role role) {
+        Member existing = members.get(memberId);
+        if (existing == null) throw new IllegalArgumentException("member not found");
+        Member updated = new Member(existing.getId(), existing.getEmail(), existing.getNickname(), existing.getPasswordHash(), role);
+        members.put(memberId, updated);
+        return updated;
     }
 }

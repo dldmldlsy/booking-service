@@ -5,6 +5,7 @@ import com.booking.service.api.auth.JwtService;
 import com.booking.service.api.member.MemberService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -33,8 +34,11 @@ public class SecurityConfig {
                                 "/auth/login",
                                 "/auth/refresh",
                                 "/hello",
-                        "/accommodations",
-                        "/actuator/health").permitAll()
+                                "/actuator/health").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/accommodations", "/accommodations/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/hosts/apply").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/accommodations/**").hasRole("HOST")
+                        .requestMatchers(HttpMethod.DELETE, "/accommodations/**").hasRole("HOST")
                         .anyRequest().authenticated())
                 .addFilterBefore(new JwtAuthFilter(jwtService, memberService, blacklistStore), UsernamePasswordAuthenticationFilter.class);
         return http.build();

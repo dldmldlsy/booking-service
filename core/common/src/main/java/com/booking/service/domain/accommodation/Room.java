@@ -1,38 +1,54 @@
 package com.booking.service.domain.accommodation;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import java.math.BigDecimal;
-import java.util.Objects;
 
 /**
  * 숙소의 개별 객실 정보를 나타내는 도메인 모델.
  */
+@Entity
+@Table(name = "rooms")
 public class Room {
-    private final Long id;
-    private final Long accommodationId;
-    private final String name;
-    private final int capacity;
-    private final BigDecimal basePrice;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    public Room(Long id, Long accommodationId, String name, int capacity, BigDecimal basePrice) {
-        this.id = Objects.requireNonNull(id, "id is required");
-        this.accommodationId = Objects.requireNonNull(accommodationId, "accommodationId is required");
-        this.name = Objects.requireNonNull(name, "name is required");
-        if (capacity <= 0) {
-            throw new IllegalArgumentException("capacity must be positive");
-        }
+    @ManyToOne
+    @JoinColumn(name = "accommodation_id", nullable = false)
+    private Accommodation accommodation;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false)
+    private int capacity;
+
+    @Column(nullable = false)
+    private BigDecimal basePrice;
+
+    protected Room() {
+    }
+
+    public Room(Accommodation accommodation, String name, int capacity, BigDecimal basePrice) {
+        this.accommodation = accommodation;
+        this.name = name;
         this.capacity = capacity;
-        this.basePrice = Objects.requireNonNull(basePrice, "basePrice is required");
-        if (basePrice.signum() < 0) {
-            throw new IllegalArgumentException("basePrice must be >= 0");
-        }
+        this.basePrice = basePrice;
     }
 
     public Long getId() {
         return id;
     }
 
-    public Long getAccommodationId() {
-        return accommodationId;
+    public Accommodation getAccommodation() {
+        return accommodation;
     }
 
     public String getName() {

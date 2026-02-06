@@ -1,50 +1,79 @@
 package com.booking.service.domain.reservation;
 
+import com.booking.service.domain.accommodation.Room;
+import com.booking.service.domain.member.Member;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 /**
- * 예약 도메인 모델. 단순 POJO이며 생성 시 기본 검증을 수행한다.
+ * 예약 도메인 모델.
  */
+@Entity
+@Table(name = "reservations")
 public class Reservation {
-    private final Long id;
-    private final Long memberId;
-    private final Long roomId;
-    private final LocalDate checkInDate;
-    private final LocalDate checkOutDate;
-    private final ReservationStatus status;
-    private final LocalDateTime createdAt;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    public Reservation(Long id,
-                       Long memberId,
-                       Long roomId,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_id", nullable = false)
+    private Room room;
+
+    @Column(nullable = false)
+    private LocalDate checkInDate;
+
+    @Column(nullable = false)
+    private LocalDate checkOutDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ReservationStatus status;
+
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    protected Reservation() {
+    }
+
+    public Reservation(Member member,
+                       Room room,
                        LocalDate checkInDate,
                        LocalDate checkOutDate,
                        ReservationStatus status,
                        LocalDateTime createdAt) {
-        this.id = Objects.requireNonNull(id, "id is required");
-        this.memberId = Objects.requireNonNull(memberId, "memberId is required");
-        this.roomId = Objects.requireNonNull(roomId, "roomId is required");
-        this.checkInDate = Objects.requireNonNull(checkInDate, "checkInDate is required");
-        this.checkOutDate = Objects.requireNonNull(checkOutDate, "checkOutDate is required");
-        if (!checkInDate.isBefore(checkOutDate)) {
-            throw new IllegalArgumentException("checkInDate must be before checkOutDate");
-        }
-        this.status = Objects.requireNonNull(status, "status is required");
-        this.createdAt = Objects.requireNonNull(createdAt, "createdAt is required");
+        this.member = member;
+        this.room = room;
+        this.checkInDate = checkInDate;
+        this.checkOutDate = checkOutDate;
+        this.status = status;
+        this.createdAt = createdAt;
     }
 
     public Long getId() {
         return id;
     }
 
-    public Long getMemberId() {
-        return memberId;
+    public Member getMember() {
+        return member;
     }
 
-    public Long getRoomId() {
-        return roomId;
+    public Room getRoom() {
+        return room;
     }
 
     public LocalDate getCheckInDate() {
@@ -61,5 +90,9 @@ public class Reservation {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public void cancel() {
+        this.status = ReservationStatus.CANCELED;
     }
 }

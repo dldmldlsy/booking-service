@@ -1,40 +1,49 @@
 package com.booking.service.api.reservation;
 
 import com.booking.service.api.accommodation.AccommodationService;
+import com.booking.service.api.accommodation.RoomRepository;
+import com.booking.service.api.member.MemberService;
+import com.booking.service.domain.accommodation.Room;
+import com.booking.service.domain.member.Member;
 import com.booking.service.domain.reservation.Reservation;
 import com.booking.service.domain.reservation.ReservationStatus;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.Optional;
-
-import org.springframework.stereotype.Service;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 인메모리 예약 서비스. 재고 확인 후 예약을 생성하고 보관한다.
+ * 예약 서비스 (JPA).
  */
 @Service
 public class ReservationService {
 
     private final AccommodationService accommodationService;
-    private final Map<Long, Reservation> reservations = new LinkedHashMap<>();
-    private final AtomicLong seq = new AtomicLong(1);
+    private final RoomRepository roomRepository;
+    private final MemberService memberService;
+    private final ReservationRepository reservationRepository;
 
-    public ReservationService(AccommodationService accommodationService) {
+    public ReservationService(AccommodationService accommodationService,
+                              RoomRepository roomRepository,
+                              MemberService memberService,
+                              ReservationRepository reservationRepository) {
         this.accommodationService = accommodationService;
+        this.roomRepository = roomRepository;
+        this.memberService = memberService;
+        this.reservationRepository = reservationRepository;
     }
 
+    @Transactional
     public Reservation create(CreateReservationRequest request) {
         validateDateRange(request.checkInDate(), request.checkOutDate());
-        var room = accommodationService.findRoom(request.roomId())
+        Room room = roomRepository.findById(request.roomId())
                 .orElseThrow(() -> new IllegalArgumentException("room not found: " + request.roomId()));
+        Member member = memberService.findById(request.memberId())
+                .orElseThrow(() -> new IllegalArgumentException("member not found: " + request.memberId()));
 
         if (!accommodationService.hasAvailability(room.getId(), request.checkInDate(), request.checkOutDate())) {
             throw new IllegalStateException("not enough availability for requested dates");
@@ -42,54 +51,44 @@ public class ReservationService {
 
         accommodationService.consumeAvailability(room.getId(), request.checkInDate(), request.checkOutDate());
 
-        Long id = seq.getAndIncrement();
         Reservation reservation = new Reservation(
-                id,
-                request.memberId(),
-                room.getId(),
+                member,
+                room,
                 request.checkInDate(),
                 request.checkOutDate(),
                 ReservationStatus.RESERVED,
                 LocalDateTime.now()
         );
-        reservations.put(id, reservation);
-        return reservation;
+        return reservationRepository.save(reservation);
     }
 
     public Reservation findById(Long id) {
-        return Optional.ofNullable(reservations.get(id))
+        return reservationRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("reservation not found: " + id));
     }
 
+    @Transactional
     public Reservation cancel(Long id) {
         Reservation existing = findById(id);
         if (existing.getStatus() == ReservationStatus.CANCELED) {
             throw new IllegalStateException("reservation already canceled");
         }
-        accommodationService.releaseAvailability(existing.getRoomId(), existing.getCheckInDate(), existing.getCheckOutDate());
-        Reservation canceled = new Reservation(
-                existing.getId(),
-                existing.getMemberId(),
-                existing.getRoomId(),
-                existing.getCheckInDate(),
-                existing.getCheckOutDate(),
-                ReservationStatus.CANCELED,
-                existing.getCreatedAt()
-        );
-        reservations.put(id, canceled);
-        return canceled;
+        accommodationService.releaseAvailability(existing.getRoom().getId(), existing.getCheckInDate(), existing.getCheckOutDate());
+        existing.cancel();
+        return reservationRepository.save(existing);
     }
 
+    @Transactional
     public void delete(Long id) {
         Reservation existing = findById(id);
         if (existing.getStatus() == ReservationStatus.RESERVED) {
-            accommodationService.releaseAvailability(existing.getRoomId(), existing.getCheckInDate(), existing.getCheckOutDate());
+            accommodationService.releaseAvailability(existing.getRoom().getId(), existing.getCheckInDate(), existing.getCheckOutDate());
         }
-        reservations.remove(id);
+        reservationRepository.delete(existing);
     }
 
     public List<Reservation> findAll() {
-        return new ArrayList<>(reservations.values());
+        return reservationRepository.findAll();
     }
 
     private void validateDateRange(LocalDate checkIn, LocalDate checkOut) {

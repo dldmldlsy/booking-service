@@ -3,83 +3,82 @@ package com.booking.service.api.accommodation;
 import com.booking.service.domain.accommodation.Accommodation;
 import com.booking.service.domain.accommodation.Availability;
 import com.booking.service.domain.accommodation.Room;
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
-
-import org.springframework.stereotype.Service;
+import jakarta.annotation.PostConstruct;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 인메모리 숙소/객실/재고 데이터를 관리하는 서비스.
- * 실제 DB 연동 없이 샘플 데이터를 보유하고 예약 시 재고를 차감한다.
+ * 숙소/객실/재고 데이터를 JPA로 관리하는 서비스.
  */
 @Service
 public class AccommodationService {
 
-    private final Map<Long, Accommodation> accommodations = new HashMap<>();
-    private final Map<Long, Room> rooms = new HashMap<>();
-    private final Map<Long, List<Availability>> availabilityByRoom = new HashMap<>();
-    private final AtomicLong accommodationSeq = new AtomicLong(1);
-    private final AtomicLong roomSeq = new AtomicLong(1);
-    private final AtomicLong availabilitySeq = new AtomicLong(1);
+    private final AccommodationRepository accommodationRepository;
+    private final RoomRepository roomRepository;
+    private final AvailabilityRepository availabilityRepository;
 
-    public AccommodationService() {
-        seedSampleData();
-        long nextId = accommodations.keySet().stream()
-                .mapToLong(Long::longValue)
-                .max()
-                .orElse(0L) + 1;
-        accommodationSeq.set(nextId);
+    public AccommodationService(AccommodationRepository accommodationRepository,
+                                RoomRepository roomRepository,
+                                AvailabilityRepository availabilityRepository) {
+        this.accommodationRepository = accommodationRepository;
+        this.roomRepository = roomRepository;
+        this.availabilityRepository = availabilityRepository;
+    }
 
-        long nextRoomId = rooms.keySet().stream()
-                .mapToLong(Long::longValue)
-                .max()
-                .orElse(0L) + 1;
-        roomSeq.set(nextRoomId);
+    @PostConstruct
+    @Transactional
+    void seedIfEmpty() {
+        if (accommodationRepository.count() > 0) return;
+        Accommodation seoulStay = accommodationRepository.save(new Accommodation("Seoul Stay", "Seoul", "도심 접근성 좋은 숙소"));
+        Accommodation busanBay = accommodationRepository.save(new Accommodation("Busan Bay", "Busan", "해변 근처 숙소"));
 
-        long nextAvailabilityId = availabilityByRoom.values().stream()
-                .flatMap(List::stream)
-                .mapToLong(Availability::getId)
-                .max()
-                .orElse(0L) + 1;
-        availabilitySeq.set(nextAvailabilityId);
+        Room seoulTwin = roomRepository.save(new Room(seoulStay, "Twin Room", 2, new BigDecimal("90000")));
+        Room seoulSuite = roomRepository.save(new Room(seoulStay, "Suite", 4, new BigDecimal("150000")));
+        Room busanOcean = roomRepository.save(new Room(busanBay, "Ocean View", 3, new BigDecimal("120000")));
+
+        LocalDate today = LocalDate.now();
+        for (int i = 0; i < 5; i++) {
+            LocalDate date = today.plusDays(i);
+            availabilityRepository.save(new Availability(seoulTwin, date, 3));
+            availabilityRepository.save(new Availability(seoulSuite, date, 2));
+            availabilityRepository.save(new Availability(busanOcean, date, 5));
+        }
     }
 
     public List<Accommodation> getAccommodations() {
-        return new ArrayList<>(accommodations.values());
+        return accommodationRepository.findAll();
     }
 
     public Accommodation getAccommodation(Long accommodationId) {
-        return Optional.ofNullable(accommodations.get(accommodationId))
+        return accommodationRepository.findById(accommodationId)
                 .orElseThrow(() -> new IllegalArgumentException("accommodation not found: " + accommodationId));
     }
 
     public List<Room> getRoomsByAccommodation(Long accommodationId) {
-        return rooms.values().stream()
-                .filter(r -> r.getAccommodationId().equals(accommodationId))
-                .toList();
+        return roomRepository.findByAccommodation_Id(accommodationId);
     }
 
     public Map<Long, List<Availability>> getAvailabilityByRoom() {
-        return Collections.unmodifiableMap(availabilityByRoom);
+        return roomRepository.findAll().stream()
+                .collect(Collectors.toMap(Room::getId, room -> availabilityRepository.findByRoom(room)));
     }
 
     public Optional<Room> findRoom(Long roomId) {
-        return Optional.ofNullable(rooms.get(roomId));
+        return roomRepository.findById(roomId);
     }
 
+    @Transactional
     public Accommodation createAccommodation(@Valid CreateAccommodationRequest request) {
         Objects.requireNonNull(request, "request is required");
         if (request.name() == null || request.name().isBlank()) {
@@ -88,29 +87,24 @@ public class AccommodationService {
         if (request.address() == null || request.address().isBlank()) {
             throw new IllegalArgumentException("address is required");
         }
-        Long id = accommodationSeq.getAndIncrement();
-        Accommodation accommodation = new Accommodation(id, request.name(), request.address(), request.description());
-        accommodations.put(id, accommodation);
+        Accommodation accommodation = accommodationRepository.save(new Accommodation(request.name(), request.address(), request.description()));
 
         if (request.rooms() != null) {
-            request.rooms().forEach(roomRequest -> createRoom(id, roomRequest));
+            request.rooms().forEach(roomRequest -> createRoom(accommodation, roomRequest));
         }
         return accommodation;
     }
 
+    @Transactional
     public void deleteAccommodation(Long accommodationId) {
-        Accommodation removed = accommodations.remove(accommodationId);
-        if (removed == null) {
-            throw new IllegalArgumentException("accommodation not found: " + accommodationId);
-        }
-        // Remove rooms and related availability for this accommodation
-        rooms.entrySet().removeIf(entry -> {
-            if (entry.getValue().getAccommodationId().equals(accommodationId)) {
-                availabilityByRoom.remove(entry.getKey());
-                return true;
-            }
-            return false;
-        });
+        Accommodation existing = accommodationRepository.findById(accommodationId)
+                .orElseThrow(() -> new IllegalArgumentException("accommodation not found: " + accommodationId));
+        roomRepository.findByAccommodation_Id(accommodationId)
+                .forEach(room -> {
+                    availabilityRepository.findByRoom(room).forEach(availabilityRepository::delete);
+                    roomRepository.delete(room);
+                });
+        accommodationRepository.delete(existing);
     }
 
     /**
@@ -126,19 +120,27 @@ public class AccommodationService {
     /**
      * 재고를 차감한다. 사전에 hasAvailability로 검증되어야 한다.
      */
+    @Transactional
     public void consumeAvailability(Long roomId, LocalDate checkIn, LocalDate checkOut) {
         iterateDates(checkIn, checkOut)
                 .forEach(date -> availabilityFor(roomId, date)
-                        .ifPresent(Availability::decrement));
+                        .ifPresent(av -> {
+                            av.decrement();
+                            availabilityRepository.save(av);
+                        }));
     }
 
     /**
      * 예약 취소 시 재고를 복원한다.
      */
+    @Transactional
     public void releaseAvailability(Long roomId, LocalDate checkIn, LocalDate checkOut) {
         iterateDates(checkIn, checkOut)
                 .forEach(date -> availabilityFor(roomId, date)
-                        .ifPresent(Availability::increment));
+                        .ifPresent(av -> {
+                            av.increment();
+                            availabilityRepository.save(av);
+                        }));
     }
 
     /**
@@ -151,46 +153,26 @@ public class AccommodationService {
         if (!from.isBefore(to)) {
             throw new IllegalArgumentException("from must be before to");
         }
-        // room 존재 확인
-        findRoom(roomId).orElseThrow(() -> new IllegalArgumentException("room not found: " + roomId));
+        Room room = findRoom(roomId).orElseThrow(() -> new IllegalArgumentException("room not found: " + roomId));
 
-        return availabilityByRoom.getOrDefault(roomId, List.of()).stream()
+        return availabilityRepository.findByRoom(room).stream()
                 .filter(av -> !av.getDate().isBefore(from) && av.getDate().isBefore(to))
                 .collect(Collectors.toMap(Availability::getDate, Availability::getAvailableCount));
     }
 
     private Optional<Availability> availabilityFor(Long roomId, LocalDate date) {
-        return availabilityByRoom.getOrDefault(roomId, List.of())
-                .stream()
-                .filter(av -> av.getDate().equals(date))
-                .findFirst();
+        return roomRepository.findById(roomId)
+                .flatMap(room -> availabilityRepository.findByRoomAndDate(room, date));
     }
 
-    private void seedSampleData() {
-        Accommodation seoulStay = new Accommodation(1L, "Seoul Stay", "Seoul", "도심 접근성 좋은 숙소");
-        Accommodation busanBay = new Accommodation(2L, "Busan Bay", "Busan", "해변 근처 숙소");
-        accommodations.put(seoulStay.getId(), seoulStay);
-        accommodations.put(busanBay.getId(), busanBay);
-
-        Room seoulTwin = new Room(101L, 1L, "Twin Room", 2, new BigDecimal("90000"));
-        Room seoulSuite = new Room(102L, 1L, "Suite", 4, new BigDecimal("150000"));
-        Room busanOcean = new Room(201L, 2L, "Ocean View", 3, new BigDecimal("120000"));
-        rooms.put(seoulTwin.getId(), seoulTwin);
-        rooms.put(seoulSuite.getId(), seoulSuite);
-        rooms.put(busanOcean.getId(), busanOcean);
-
-        LocalDate today = LocalDate.now();
-        // 간단히 5일치 재고를 채워둔다.
-        availabilityByRoom.put(seoulTwin.getId(), new ArrayList<>());
-        availabilityByRoom.put(seoulSuite.getId(), new ArrayList<>());
-        availabilityByRoom.put(busanOcean.getId(), new ArrayList<>());
-
-        for (int i = 0; i < 5; i++) {
-            LocalDate date = today.plusDays(i);
-            availabilityByRoom.get(seoulTwin.getId()).add(new Availability(1_000L + i, seoulTwin.getId(), date, 3));
-            availabilityByRoom.get(seoulSuite.getId()).add(new Availability(2_000L + i, seoulSuite.getId(), date, 2));
-            availabilityByRoom.get(busanOcean.getId()).add(new Availability(3_000L + i, busanOcean.getId(), date, 5));
+    private Room createRoom(Accommodation accommodation, CreateRoomRequest request) {
+        Room room = new Room(accommodation, request.name(), request.capacity(), request.basePrice());
+        room = roomRepository.save(room);
+        if (request.availabilityByDate() != null) {
+            request.availabilityByDate().forEach((date, count) ->
+                    availabilityRepository.save(new Availability(room, date, count)));
         }
+        return room;
     }
 
     private java.util.stream.Stream<LocalDate> iterateDates(LocalDate start, LocalDate endExclusive) {
@@ -200,43 +182,20 @@ public class AccommodationService {
             throw new IllegalArgumentException("start must be before end");
         }
         long days = java.time.temporal.ChronoUnit.DAYS.between(start, endExclusive);
-        return java.util.stream.Stream.iterate(start, d -> d.plusDays(1)).limit(days);
-    }
-
-    private Room createRoom(Long accommodationId, CreateRoomRequest request) {
-        Objects.requireNonNull(request, "room request is required");
-        Long roomId = roomSeq.getAndIncrement();
-        Room room = new Room(roomId, accommodationId, request.name(), request.capacity(), BigDecimal.valueOf(request.basePrice()));
-        rooms.put(roomId, room);
-
-        Map<LocalDate, Integer> availabilityByDate = request.availabilityByDate() == null
-                ? Map.of()
-                : request.availabilityByDate();
-        List<Availability> availabilityList = availabilityByRoom.computeIfAbsent(roomId, k -> new ArrayList<>());
-        availabilityByDate.forEach((date, count) -> {
-            if (date == null) {
-                throw new IllegalArgumentException("availability date is required");
-            }
-            if (count == null || count < 0) {
-                throw new IllegalArgumentException("availability count must be >= 0");
-            }
-            Long availabilityId = availabilitySeq.getAndIncrement();
-            availabilityList.add(new Availability(availabilityId, roomId, date, count));
-        });
-        return room;
+        return java.util.stream.LongStream.range(0, days).mapToObj(start::plusDays);
     }
 
     public record CreateAccommodationRequest(
             @NotBlank String name,
             @NotBlank String address,
             String description,
-            @Valid List<CreateRoomRequest> rooms) {
+            List<CreateRoomRequest> rooms) {
     }
 
     public record CreateRoomRequest(
             @NotBlank String name,
             @Positive int capacity,
-            @PositiveOrZero long basePrice,
+            @PositiveOrZero BigDecimal basePrice,
             Map<LocalDate, Integer> availabilityByDate) {
     }
 }

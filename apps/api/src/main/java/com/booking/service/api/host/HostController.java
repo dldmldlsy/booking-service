@@ -35,7 +35,8 @@ public class HostController {
                                                                   Authentication authentication) {
         Member me = requireMember(authentication);
         // 간단하게 즉시 승인 처리. 추후 심사 프로세스가 필요하면 Status.PENDING으로 저장하고 승인 API 추가.
-        HostProfile profile = hostProfileService.createOrUpdate(me.getId(), request.businessNumber(), HostProfile.Status.APPROVED);
+        HostProfile profile = new HostProfile(me, request.businessNumber(), HostProfile.Status.APPROVED);
+        profile = hostProfileService.createOrUpdate(profile);
         Member updated = memberService.changeRole(me.getId(), Member.Role.HOST);
         HostProfileResponse response = HostProfileResponse.from(profile, updated.getRole());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
@@ -61,7 +62,7 @@ public class HostController {
 
     public record HostProfileResponse(Long memberId, String businessNumber, String status, String role) {
         public static HostProfileResponse from(HostProfile profile, Member.Role role) {
-            return new HostProfileResponse(profile.getMemberId(), profile.getBusinessNumber(), profile.getStatus().name(), role.name());
+            return new HostProfileResponse(profile.getMember().getId(), profile.getBusinessNumber(), profile.getStatus().name(), role.name());
         }
     }
 }

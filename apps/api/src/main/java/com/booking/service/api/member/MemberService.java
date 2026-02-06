@@ -1,12 +1,10 @@
 package com.booking.service.api.member;
 
 import com.booking.service.domain.member.Member;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 인메모리 회원 서비스.
@@ -14,52 +12,51 @@ import org.springframework.stereotype.Service;
 @Service
 public class MemberService {
 
-    private final Map<Long, Member> members = new ConcurrentHashMap<>();
-    private final AtomicLong seq = new AtomicLong(1);
+    private final MemberRepository memberRepository;
 
+    public MemberService(MemberRepository memberRepository) {
+        this.memberRepository = memberRepository;
+    }
+
+    @Transactional
     public Member register(String email, String nickname, String rawPassword) {
         if (email == null || email.isBlank()) throw new IllegalArgumentException("email is required");
         if (nickname == null || nickname.isBlank()) throw new IllegalArgumentException("nickname is required");
         if (rawPassword == null || rawPassword.isBlank()) throw new IllegalArgumentException("password is required");
 
-        if (findByEmail(email).isPresent()) {
+        if (memberRepository.findByEmail(email).isPresent()) {
             throw new IllegalStateException("email already registered");
         }
-        Long id = seq.getAndIncrement();
         String hash = BCrypt.hashpw(rawPassword, BCrypt.gensalt());
-        Member member = new Member(id, email, nickname, hash, Member.Role.USER);
-        members.put(id, member);
-        return member;
+        Member member = new Member(email, nickname, hash, Member.Role.USER);
+        return memberRepository.save(member);
     }
 
     public Optional<Member> findByEmail(String email) {
-        return members.values().stream()
-                .filter(m -> m.getEmail().equalsIgnoreCase(email))
-                .findFirst();
+        return memberRepository.findByEmail(email);
     }
 
     public Optional<Member> findById(Long id) {
-        return Optional.ofNullable(members.get(id));
+        return memberRepository.findById(id);
     }
 
+    @Transactional
     public Member updateProfile(Long id, String nickname) {
-        Member existing = members.get(id);
-        if (existing == null) throw new IllegalArgumentException("member not found");
-        String newNickname = nickname == null || nickname.isBlank() ? existing.getNickname() : nickname;
-        Member updated = new Member(existing.getId(), existing.getEmail(), newNickname, existing.getPasswordHash(), existing.getRole());
-        members.put(id, updated);
-        return updated;
+        Member existing = memberRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("member not found"));
+        if (nickname != null && !nickname.isBlank()) {
+            existing.setNickname(nickname);
+        }
+        return memberRepository.save(existing);
     }
 
     public boolean matchesPassword(Member member, String rawPassword) {
         return BCrypt.checkpw(rawPassword, member.getPasswordHash());
     }
 
+    @Transactional
     public Member changeRole(Long memberId, Member.Role role) {
-        Member existing = members.get(memberId);
-        if (existing == null) throw new IllegalArgumentException("member not found");
-        Member updated = new Member(existing.getId(), existing.getEmail(), existing.getNickname(), existing.getPasswordHash(), role);
-        members.put(memberId, updated);
-        return updated;
+        Member existing = memberRepository.findById(memberId).orElseThrow(() -> new IllegalArgumentException("member not found"));
+        existing.setRole(role);
+        return memberRepository.save(existing);
     }
 }

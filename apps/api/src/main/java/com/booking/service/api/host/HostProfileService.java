@@ -1,10 +1,9 @@
 package com.booking.service.api.host;
 
 import com.booking.service.domain.host.HostProfile;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 인메모리 호스트 프로필 서비스.
@@ -12,15 +11,18 @@ import org.springframework.stereotype.Service;
 @Service
 public class HostProfileService {
 
-    private final Map<Long, HostProfile> profiles = new ConcurrentHashMap<>();
+    private final HostProfileRepository repository;
 
-    public HostProfile createOrUpdate(Long memberId, String businessNumber, HostProfile.Status initialStatus) {
-        HostProfile profile = new HostProfile(memberId, businessNumber, initialStatus);
-        profiles.put(memberId, profile);
-        return profile;
+    public HostProfileService(HostProfileRepository repository) {
+        this.repository = repository;
+    }
+
+    @Transactional
+    public HostProfile createOrUpdate(HostProfile profile) {
+        return repository.save(profile);
     }
 
     public Optional<HostProfile> findByMemberId(Long memberId) {
-        return Optional.ofNullable(profiles.get(memberId));
+        return repository.findByMember_Id(memberId);
     }
 }

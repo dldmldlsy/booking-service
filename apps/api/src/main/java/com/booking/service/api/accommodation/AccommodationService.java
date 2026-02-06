@@ -166,13 +166,12 @@ public class AccommodationService {
     }
 
     private Room createRoom(Accommodation accommodation, CreateRoomRequest request) {
-        Room room = new Room(accommodation, request.name(), request.capacity(), request.basePrice());
-        room = roomRepository.save(room);
+        Room savedRoom = roomRepository.save(new Room(accommodation, request.name(), request.capacity(), request.basePrice()));
         if (request.availabilityByDate() != null) {
             request.availabilityByDate().forEach((date, count) ->
-                    availabilityRepository.save(new Availability(room, date, count)));
+                    availabilityRepository.save(new Availability(savedRoom, date, count)));
         }
-        return room;
+        return savedRoom;
     }
 
     private java.util.stream.Stream<LocalDate> iterateDates(LocalDate start, LocalDate endExclusive) {

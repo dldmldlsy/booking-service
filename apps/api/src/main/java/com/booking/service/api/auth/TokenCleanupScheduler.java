@@ -10,18 +10,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class TokenCleanupScheduler {
 
-    private final RefreshTokenStore refreshTokenStore;
-    private final BlacklistStore blacklistStore;
+    private final TokenService tokenService;
 
-    public TokenCleanupScheduler(RefreshTokenStore refreshTokenStore, BlacklistStore blacklistStore) {
-        this.refreshTokenStore = refreshTokenStore;
-        this.blacklistStore = blacklistStore;
+    public TokenCleanupScheduler(TokenService tokenService) {
+        this.tokenService = tokenService;
     }
 
     @Scheduled(fixedDelayString = "${token.cleanup-interval-ms:300000}")
     public void cleanup() {
-        Instant now = Instant.now();
-        refreshTokenStore.cleanupExpired(now);
-        blacklistStore.cleanupExpired(now);
+        tokenService.cleanupExpired(Instant.now());
     }
 }

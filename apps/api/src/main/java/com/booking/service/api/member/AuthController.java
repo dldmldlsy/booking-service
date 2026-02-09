@@ -1,8 +1,7 @@
 package com.booking.service.api.member;
 
-import com.booking.service.api.auth.BlacklistStore;
 import com.booking.service.api.auth.JwtService;
-import com.booking.service.api.auth.RefreshTokenStore;
+import com.booking.service.api.auth.TokenService;
 import com.booking.service.api.common.ApiResponse;
 import com.booking.service.api.member.dto.LoginRequest;
 import com.booking.service.api.member.dto.MemberResponse;
@@ -31,17 +30,14 @@ public class AuthController {
 
     private final MemberService memberService;
     private final JwtService jwtService;
-    private final RefreshTokenStore refreshTokenStore;
-    private final BlacklistStore blacklistStore;
+    private final TokenService tokenService;
 
     public AuthController(MemberService memberService,
                           JwtService jwtService,
-                          RefreshTokenStore refreshTokenStore,
-                          BlacklistStore blacklistStore) {
+                          TokenService tokenService) {
         this.memberService = memberService;
         this.jwtService = jwtService;
-        this.refreshTokenStore = refreshTokenStore;
-        this.blacklistStore = blacklistStore;
+        this.tokenService = tokenService;
     }
 
     @PostMapping("/auth/signup")
@@ -60,7 +56,7 @@ public class AuthController {
         }
         String access = jwtService.generateAccessToken(member.getId());
         String refresh = jwtService.generateRefreshToken(member.getId());
-        refreshTokenStore.save(refresh, member.getId(), jwtService.getExpiration(refresh));
+        tokenService.saveRefreshToken(refresh, member.getId(), jwtService.getExpiration(refresh));
         return ApiResponse.ok(new TokenResponse(access, refresh));
     }
 
@@ -73,20 +69,20 @@ public class AuthController {
         if (!jwtService.isValid(refreshToken)) {
             throw new IllegalArgumentException("invalid refresh token");
         }
-        RefreshTokenStore.TokenMeta meta = refreshTokenStore.find(refreshToken)
+        var meta = tokenService.findRefreshToken(refreshToken)
                 .orElseThrow(() -> new IllegalArgumentException("refresh token not recognized"));
 
         Long tokenSubject = jwtService.parseMemberId(refreshToken);
-        if (!meta.memberId().equals(tokenSubject)) {
+        if (!meta.getMemberId().equals(tokenSubject)) {
             throw new IllegalArgumentException("refresh token owner mismatch");
         }
         // 기존 리프레시 토큰 무효화 및 블랙리스트 등록
-        refreshTokenStore.delete(refreshToken);
-        blacklistStore.blacklist(refreshToken, meta.expiresAt());
+        tokenService.deleteRefreshToken(refreshToken);
+        tokenService.blacklist(refreshToken, meta.getExpiresAt());
 
-        String newAccess = jwtService.generateAccessToken(meta.memberId());
-        String newRefresh = jwtService.generateRefreshToken(meta.memberId());
-        refreshTokenStore.save(newRefresh, meta.memberId(), jwtService.getExpiration(newRefresh));
+        String newAccess = jwtService.generateAccessToken(meta.getMemberId());
+        String newRefresh = jwtService.generateRefreshToken(meta.getMemberId());
+        tokenService.saveRefreshToken(newRefresh, meta.getMemberId(), jwtService.getExpiration(newRefresh));
         return ApiResponse.ok(new TokenResponse(newAccess, newRefresh));
     }
 
@@ -95,12 +91,12 @@ public class AuthController {
                                     @Valid @RequestBody RefreshRequest request) {
         String accessToken = extractToken(authorization);
         if (jwtService.isValid(accessToken)) {
-            blacklistStore.blacklist(accessToken, jwtService.getExpiration(accessToken));
+            tokenService.blacklist(accessToken, jwtService.getExpiration(accessToken));
         }
         String refreshToken = request.refreshToken();
         if (refreshToken != null && !refreshToken.isBlank() && jwtService.isValid(refreshToken)) {
-            blacklistStore.blacklist(refreshToken, jwtService.getExpiration(refreshToken));
-            refreshTokenStore.delete(refreshToken);
+            tokenService.blacklist(refreshToken, jwtService.getExpiration(refreshToken));
+            tokenService.deleteRefreshToken(refreshToken);
         }
         return ApiResponse.ok(null);
     }

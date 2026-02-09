@@ -1,7 +1,7 @@
 package com.booking.service.api.config;
 
-import com.booking.service.api.auth.BlacklistStore;
 import com.booking.service.api.auth.JwtService;
+import com.booking.service.api.auth.TokenService;
 import com.booking.service.api.member.MemberService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,12 +16,12 @@ public class SecurityConfig {
 
     private final JwtService jwtService;
     private final MemberService memberService;
-    private final BlacklistStore blacklistStore;
+    private final TokenService tokenService;
 
-    public SecurityConfig(JwtService jwtService, MemberService memberService, BlacklistStore blacklistStore) {
+    public SecurityConfig(JwtService jwtService, MemberService memberService, TokenService tokenService) {
         this.jwtService = jwtService;
         this.memberService = memberService;
-        this.blacklistStore = blacklistStore;
+        this.tokenService = tokenService;
     }
 
     @Bean
@@ -40,7 +40,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/accommodations/**").hasRole("HOST")
                         .requestMatchers(HttpMethod.DELETE, "/accommodations/**").hasRole("HOST")
                         .anyRequest().authenticated())
-                .addFilterBefore(new JwtAuthFilter(jwtService, memberService, blacklistStore), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthFilter(jwtService, memberService, tokenService), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }

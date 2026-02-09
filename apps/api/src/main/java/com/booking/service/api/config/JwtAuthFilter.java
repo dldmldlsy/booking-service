@@ -1,7 +1,7 @@
 package com.booking.service.api.config;
 
-import com.booking.service.api.auth.BlacklistStore;
 import com.booking.service.api.auth.JwtService;
+import com.booking.service.api.auth.TokenService;
 import com.booking.service.api.member.MemberService;
 import com.booking.service.domain.member.Member;
 import jakarta.servlet.FilterChain;
@@ -23,12 +23,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final MemberService memberService;
-    private final BlacklistStore blacklistStore;
+    private final TokenService tokenService;
 
-    public JwtAuthFilter(JwtService jwtService, MemberService memberService, BlacklistStore blacklistStore) {
+    public JwtAuthFilter(JwtService jwtService, MemberService memberService, TokenService tokenService) {
         this.jwtService = jwtService;
         this.memberService = memberService;
-        this.blacklistStore = blacklistStore;
+        this.tokenService = tokenService;
     }
 
     @Override
@@ -39,7 +39,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (auth != null && auth.startsWith("Bearer ")) {
             String token = auth.substring("Bearer ".length());
             if (jwtService.isValid(token)) {
-                if (blacklistStore.isBlacklisted(token)) {
+                if (tokenService.isBlacklisted(token)) {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     return;
                 }

@@ -42,6 +42,10 @@ logs/
 .env.*
 application-local.yml
 application-local.properties
+apps/api/src/main/resources/application.properties
+
+### Build output (IDE/Java)
+apps/api/bin/
 
 ### ===============================
 ### Test / Temp

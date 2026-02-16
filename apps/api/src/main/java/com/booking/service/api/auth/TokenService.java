@@ -1,11 +1,8 @@
 package com.booking.service.api.auth;
 
-import com.booking.service.domain.token.BlacklistedToken;
-import com.booking.service.domain.token.RefreshToken;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 토큰 영속화/블랙리스트 관리.
@@ -13,45 +10,29 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TokenService {
 
-    private final RefreshTokenRepository refreshTokenRepository;
-    private final BlacklistedTokenRepository blacklistedTokenRepository;
+    private final RedisTokenRepository redisTokenRepository;
 
-    public TokenService(RefreshTokenRepository refreshTokenRepository,
-                        BlacklistedTokenRepository blacklistedTokenRepository) {
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.blacklistedTokenRepository = blacklistedTokenRepository;
+    public TokenService(RedisTokenRepository redisTokenRepository) {
+        this.redisTokenRepository = redisTokenRepository;
     }
 
-    @Transactional
     public void saveRefreshToken(String token, Long memberId, Instant expiresAt) {
-        refreshTokenRepository.save(new RefreshToken(token, memberId, expiresAt));
+        redisTokenRepository.saveRefreshToken(token, memberId, expiresAt);
     }
 
-    @Transactional(readOnly = true)
-    public Optional<RefreshToken> findRefreshToken(String token) {
-        return refreshTokenRepository.findByToken(token);
+    public Optional<RefreshTokenInfo> findRefreshToken(String token) {
+        return redisTokenRepository.findRefreshToken(token);
     }
 
-    @Transactional
     public void deleteRefreshToken(String token) {
-        refreshTokenRepository.deleteByToken(token);
+        redisTokenRepository.deleteRefreshToken(token);
     }
 
-    @Transactional
     public void blacklist(String token, Instant expiresAt) {
-        blacklistedTokenRepository.save(new BlacklistedToken(token, expiresAt));
+        redisTokenRepository.blacklist(token, expiresAt);
     }
 
-    @Transactional(readOnly = true)
     public boolean isBlacklisted(String token) {
-        return blacklistedTokenRepository.findByToken(token)
-                .map(entry -> entry.getExpiresAt().isAfter(Instant.now()))
-                .orElse(false);
-    }
-
-    @Transactional
-    public void cleanupExpired(Instant now) {
-        refreshTokenRepository.deleteByExpiresAtBefore(now);
-        blacklistedTokenRepository.deleteByExpiresAtBefore(now);
+        return redisTokenRepository.isBlacklisted(token);
     }
 }

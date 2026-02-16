@@ -2,6 +2,7 @@ package com.booking.service.api.member;
 
 import com.booking.service.api.auth.JwtService;
 import com.booking.service.api.auth.TokenService;
+import com.booking.service.api.auth.RefreshTokenInfo;
 import com.booking.service.api.common.ApiResponse;
 import com.booking.service.api.member.dto.LoginRequest;
 import com.booking.service.api.member.dto.MemberResponse;
@@ -69,20 +70,20 @@ public class AuthController {
         if (!jwtService.isValid(refreshToken)) {
             throw new IllegalArgumentException("invalid refresh token");
         }
-        var meta = tokenService.findRefreshToken(refreshToken)
+        RefreshTokenInfo meta = tokenService.findRefreshToken(refreshToken)
                 .orElseThrow(() -> new IllegalArgumentException("refresh token not recognized"));
 
         Long tokenSubject = jwtService.parseMemberId(refreshToken);
-        if (!meta.getMemberId().equals(tokenSubject)) {
+        if (!meta.memberId().equals(tokenSubject)) {
             throw new IllegalArgumentException("refresh token owner mismatch");
         }
         // 기존 리프레시 토큰 무효화 및 블랙리스트 등록
         tokenService.deleteRefreshToken(refreshToken);
-        tokenService.blacklist(refreshToken, meta.getExpiresAt());
+        tokenService.blacklist(refreshToken, meta.expiresAt());
 
-        String newAccess = jwtService.generateAccessToken(meta.getMemberId());
-        String newRefresh = jwtService.generateRefreshToken(meta.getMemberId());
-        tokenService.saveRefreshToken(newRefresh, meta.getMemberId(), jwtService.getExpiration(newRefresh));
+        String newAccess = jwtService.generateAccessToken(meta.memberId());
+        String newRefresh = jwtService.generateRefreshToken(meta.memberId());
+        tokenService.saveRefreshToken(newRefresh, meta.memberId(), jwtService.getExpiration(newRefresh));
         return ApiResponse.ok(new TokenResponse(newAccess, newRefresh));
     }
 

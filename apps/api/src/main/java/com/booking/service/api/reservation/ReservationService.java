@@ -3,6 +3,7 @@ package com.booking.service.api.reservation;
 import com.booking.service.api.accommodation.AccommodationService;
 import com.booking.service.api.accommodation.RoomRepository;
 import com.booking.service.api.member.MemberService;
+import com.booking.service.api.support.DistributedLockService;
 import com.booking.service.domain.accommodation.Room;
 import com.booking.service.domain.member.Member;
 import com.booking.service.domain.reservation.Reservation;
@@ -26,19 +27,27 @@ public class ReservationService {
     private final RoomRepository roomRepository;
     private final MemberService memberService;
     private final ReservationRepository reservationRepository;
+    private final DistributedLockService lockService;
 
     public ReservationService(AccommodationService accommodationService,
                               RoomRepository roomRepository,
                               MemberService memberService,
-                              ReservationRepository reservationRepository) {
+                              ReservationRepository reservationRepository,
+                              DistributedLockService lockService) {
         this.accommodationService = accommodationService;
         this.roomRepository = roomRepository;
         this.memberService = memberService;
         this.reservationRepository = reservationRepository;
+        this.lockService = lockService;
     }
 
     @Transactional
     public Reservation create(CreateReservationRequest request) {
+        String lockKey = buildLockKey(request.roomId(), request.checkInDate(), request.checkOutDate());
+        return lockService.executeWithLock(lockKey, () -> createInternal(request));
+    }
+
+    private Reservation createInternal(CreateReservationRequest request) {
         validateDateRange(request.checkInDate(), request.checkOutDate());
         Room room = roomRepository.findById(request.roomId())
                 .orElseThrow(() -> new IllegalArgumentException("room not found: " + request.roomId()));
@@ -89,6 +98,10 @@ public class ReservationService {
 
     public List<Reservation> findAll() {
         return reservationRepository.findAll();
+    }
+
+    private String buildLockKey(Long roomId, LocalDate checkIn, LocalDate checkOut) {
+        return "lock:reservation:" + roomId + ":" + checkIn + ":" + checkOut;
     }
 
     private void validateDateRange(LocalDate checkIn, LocalDate checkOut) {

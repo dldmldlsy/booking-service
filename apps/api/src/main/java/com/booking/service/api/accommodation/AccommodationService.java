@@ -14,9 +14,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.booking.service.api.support.RedisKeys;
 
 /**
  * 숙소/객실/재고 데이터를 JPA로 관리하는 서비스.
@@ -27,13 +34,16 @@ public class AccommodationService {
     private final AccommodationRepository accommodationRepository;
     private final RoomRepository roomRepository;
     private final AvailabilityRepository availabilityRepository;
+    private final StringRedisTemplate redis;
 
     public AccommodationService(AccommodationRepository accommodationRepository,
                                 RoomRepository roomRepository,
-                                AvailabilityRepository availabilityRepository) {
+                                AvailabilityRepository availabilityRepository,
+                                StringRedisTemplate redis) {
         this.accommodationRepository = accommodationRepository;
         this.roomRepository = roomRepository;
         this.availabilityRepository = availabilityRepository;
+        this.redis = redis;
     }
 
     @PostConstruct
@@ -56,10 +66,12 @@ public class AccommodationService {
         }
     }
 
+    @Cacheable(cacheNames = RedisKeys.CACHE_ACCOMMODATION, key = "'all'")
     public List<Accommodation> getAccommodations() {
         return accommodationRepository.findAll();
     }
 
+    @Cacheable(cacheNames = RedisKeys.CACHE_ACCOMMODATION, key = "'id:' + #accommodationId")
     public Accommodation getAccommodation(Long accommodationId) {
         return accommodationRepository.findById(accommodationId)
                 .orElseThrow(() -> new IllegalArgumentException("accommodation not found: " + accommodationId));
@@ -79,6 +91,7 @@ public class AccommodationService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = RedisKeys.CACHE_ACCOMMODATION, allEntries = true)
     public Accommodation createAccommodation(@Valid CreateAccommodationRequest request) {
         Objects.requireNonNull(request, "request is required");
         if (request.name() == null || request.name().isBlank()) {
@@ -96,6 +109,7 @@ public class AccommodationService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {RedisKeys.CACHE_ACCOMMODATION, RedisKeys.CACHE_POPULAR_ACCOMMODATION}, allEntries = true)
     public void deleteAccommodation(Long accommodationId) {
         Accommodation existing = accommodationRepository.findById(accommodationId)
                 .orElseThrow(() -> new IllegalArgumentException("accommodation not found: " + accommodationId));
@@ -105,6 +119,7 @@ public class AccommodationService {
                     roomRepository.delete(room);
                 });
         accommodationRepository.delete(existing);
+        redis.opsForZSet().remove(RedisKeys.HOT_ACCOMMODATION, accommodationId.toString());
     }
 
     /**
@@ -172,6 +187,33 @@ public class AccommodationService {
                     availabilityRepository.save(new Availability(savedRoom, date, count)));
         }
         return savedRoom;
+    }
+
+    /**
+     * 인기 숙소 상위 N개를 반환한다. Redis ZSET을 우선 조회하며, 데이터가 없을 경우 DB 리스트를 fallback으로 사용한다.
+     */
+    @Cacheable(cacheNames = RedisKeys.CACHE_POPULAR_ACCOMMODATION, key = "'v1:' + #limit")
+    public List<Accommodation> getPopularAccommodations(int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        ZSetOperations<String, String> zset = redis.opsForZSet();
+        Set<String> idStrings = zset.reverseRange(RedisKeys.HOT_ACCOMMODATION, 0, limit - 1);
+        if (idStrings == null || idStrings.isEmpty()) {
+            return accommodationRepository.findAll().stream().limit(limit).toList();
+        }
+
+        List<Long> orderedIds = idStrings.stream()
+                .map(Long::valueOf)
+                .toList();
+
+        Map<Long, Accommodation> byId = accommodationRepository.findAllById(orderedIds).stream()
+                .collect(Collectors.toMap(Accommodation::getId, Function.identity()));
+
+        return orderedIds.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private java.util.stream.Stream<LocalDate> iterateDates(LocalDate start, LocalDate endExclusive) {

@@ -4,6 +4,7 @@ import com.booking.service.api.accommodation.AccommodationService;
 import com.booking.service.api.accommodation.RoomRepository;
 import com.booking.service.api.member.MemberService;
 import com.booking.service.api.support.DistributedLockService;
+import com.booking.service.api.support.RedisKeys;
 import com.booking.service.domain.accommodation.Room;
 import com.booking.service.domain.member.Member;
 import com.booking.service.domain.reservation.Reservation;
@@ -14,6 +15,9 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,20 +32,24 @@ public class ReservationService {
     private final MemberService memberService;
     private final ReservationRepository reservationRepository;
     private final DistributedLockService lockService;
+    private final StringRedisTemplate redis;
 
     public ReservationService(AccommodationService accommodationService,
                               RoomRepository roomRepository,
                               MemberService memberService,
                               ReservationRepository reservationRepository,
-                              DistributedLockService lockService) {
+                              DistributedLockService lockService,
+                              StringRedisTemplate redis) {
         this.accommodationService = accommodationService;
         this.roomRepository = roomRepository;
         this.memberService = memberService;
         this.reservationRepository = reservationRepository;
         this.lockService = lockService;
+        this.redis = redis;
     }
 
     @Transactional
+    @CacheEvict(cacheNames = RedisKeys.CACHE_POPULAR_ACCOMMODATION, allEntries = true)
     public Reservation create(CreateReservationRequest request) {
         String lockKey = buildLockKey(request.roomId(), request.checkInDate(), request.checkOutDate());
         return lockService.executeWithLock(lockKey, () -> createInternal(request));
@@ -68,7 +76,9 @@ public class ReservationService {
                 ReservationStatus.RESERVED,
                 LocalDateTime.now()
         );
-        return reservationRepository.save(reservation);
+        Reservation saved = reservationRepository.save(reservation);
+        incrementPopularityScore(room.getAccommodation().getId(), 1);
+        return saved;
     }
 
     public Reservation findById(Long id) {
@@ -77,6 +87,7 @@ public class ReservationService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = RedisKeys.CACHE_POPULAR_ACCOMMODATION, allEntries = true)
     public Reservation cancel(Long id) {
         Reservation existing = findById(id);
         if (existing.getStatus() == ReservationStatus.CANCELED) {
@@ -84,16 +95,20 @@ public class ReservationService {
         }
         accommodationService.releaseAvailability(existing.getRoom().getId(), existing.getCheckInDate(), existing.getCheckOutDate());
         existing.cancel();
-        return reservationRepository.save(existing);
+        Reservation saved = reservationRepository.save(existing);
+        incrementPopularityScore(existing.getRoom().getAccommodation().getId(), -1);
+        return saved;
     }
 
     @Transactional
+    @CacheEvict(cacheNames = RedisKeys.CACHE_POPULAR_ACCOMMODATION, allEntries = true)
     public void delete(Long id) {
         Reservation existing = findById(id);
         if (existing.getStatus() == ReservationStatus.RESERVED) {
             accommodationService.releaseAvailability(existing.getRoom().getId(), existing.getCheckInDate(), existing.getCheckOutDate());
         }
         reservationRepository.delete(existing);
+        redis.opsForZSet().remove(RedisKeys.HOT_ACCOMMODATION, existing.getRoom().getAccommodation().getId().toString());
     }
 
     public List<Reservation> findAll() {
@@ -111,6 +126,11 @@ public class ReservationService {
         if (!checkIn.isBefore(checkOut)) {
             throw new IllegalArgumentException("checkInDate must be before checkOutDate");
         }
+    }
+
+    private void incrementPopularityScore(Long accommodationId, double delta) {
+        ZSetOperations<String, String> zset = redis.opsForZSet();
+        zset.incrementScore(RedisKeys.HOT_ACCOMMODATION, accommodationId.toString(), delta);
     }
 
     public record CreateReservationRequest(

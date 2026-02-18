@@ -10,5 +10,7 @@ public final class RedisKeys {
     public static final String TOKEN_BLACKLIST = "token:blacklist"; // set or hash
     public static final String TOKEN_REFRESH = "token:refresh";     // map: memberId -> refresh token
     public static final String LOCK_PREFIX = "lock:";               // lock:{resource}
-    public static final String CACHE_ACCOMMODATION = "cache:accommodation"; // sample cache name
+    public static final String CACHE_ACCOMMODATION = "cache:accommodation"; // 숙소 목록/상세 캐시
+    public static final String CACHE_POPULAR_ACCOMMODATION = "cache:popular:accommodation"; // 인기 응답 캐시
+    public static final String HOT_ACCOMMODATION = "hot:accommodation:score"; // 인기 랭킹 ZSET
 }

@@ -36,7 +36,9 @@ public class SecurityConfig {
                                 "/hello",
                                 "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/accommodations", "/accommodations/*").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/hosts/apply").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/hosts/apply").hasRole("USER")
+                        .requestMatchers("/reservations").hasRole("ADMIN") // 전체 예약 목록
+                        .requestMatchers("/reservations/**").hasAnyRole("USER", "ADMIN") // 생성/내역/취소/삭제
                         .requestMatchers(HttpMethod.POST, "/accommodations/**").hasRole("HOST")
                         .requestMatchers(HttpMethod.DELETE, "/accommodations/**").hasRole("HOST")
                         .anyRequest().authenticated())

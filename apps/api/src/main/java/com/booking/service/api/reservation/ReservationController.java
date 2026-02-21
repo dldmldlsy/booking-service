@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,6 +44,12 @@ public class ReservationController {
     @GetMapping
     public ApiResponse<List<Reservation>> list() {
         return ApiResponse.ok(reservationService.findAll());
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<List<Reservation>> myReservations(Authentication authentication) {
+        var member = (com.booking.service.domain.member.Member) authentication.getPrincipal();
+        return ApiResponse.ok(reservationService.findByMember(member.getId()));
     }
 
     @PatchMapping("/{id}/cancel")

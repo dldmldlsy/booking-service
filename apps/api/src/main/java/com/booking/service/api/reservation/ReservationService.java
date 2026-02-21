@@ -115,6 +115,10 @@ public class ReservationService {
         return reservationRepository.findAll();
     }
 
+    public List<Reservation> findByMember(Long memberId) {
+        return reservationRepository.findByMember_Id(memberId);
+    }
+
     private String buildLockKey(Long roomId, LocalDate checkIn, LocalDate checkOut) {
         return "lock:reservation:" + roomId + ":" + checkIn + ":" + checkOut;
     }

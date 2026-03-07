@@ -9,6 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.LocalTime;
 
 /**
  * 숙소의 개별 객실 정보를 나타내는 도메인 모델.
@@ -33,6 +34,21 @@ public class Room {
     @Column(nullable = false)
     private BigDecimal basePrice;
 
+    @Column
+    private String description;
+
+    @Column
+    private Integer maxHeadCount;
+
+    @Column
+    private LocalTime checkInTime;
+
+    @Column
+    private LocalTime checkOutTime;
+
+    @Column
+    private String imageUrl;
+
     protected Room() {
     }
 
@@ -41,6 +57,23 @@ public class Room {
         this.name = name;
         this.capacity = capacity;
         this.basePrice = basePrice;
+    }
+
+    public Room(Accommodation accommodation,
+                String name,
+                int capacity,
+                BigDecimal basePrice,
+                String description,
+                Integer maxHeadCount,
+                LocalTime checkInTime,
+                LocalTime checkOutTime,
+                String imageUrl) {
+        this(accommodation, name, capacity, basePrice);
+        this.description = description;
+        this.maxHeadCount = maxHeadCount;
+        this.checkInTime = checkInTime;
+        this.checkOutTime = checkOutTime;
+        this.imageUrl = imageUrl;
     }
 
     public Long getId() {
@@ -61,5 +94,25 @@ public class Room {
 
     public BigDecimal getBasePrice() {
         return basePrice;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public Integer getMaxHeadCount() {
+        return maxHeadCount;
+    }
+
+    public LocalTime getCheckInTime() {
+        return checkInTime;
+    }
+
+    public LocalTime getCheckOutTime() {
+        return checkOutTime;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
     }
 }

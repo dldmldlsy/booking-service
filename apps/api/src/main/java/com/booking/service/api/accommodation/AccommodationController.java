@@ -109,17 +109,18 @@ public class AccommodationController {
                         room.getName(),
                         room.getCapacity(),
                         room.getBasePrice().longValue(),
+                        room.getImageUrl(),
                         availabilityByRoom.getOrDefault(room.getId(), List.of()).stream()
                                 .collect(Collectors.toMap(Availability::getDate, Availability::getAvailableCount))
                 ))
                 .toList();
-        return new AccommodationResponse(acc.getId(), acc.getName(), acc.getAddress(), acc.getDescription(), roomResponses);
+        return new AccommodationResponse(acc.getId(), acc.getName(), acc.getAddress(), acc.getDescription(), acc.getImageUrl(), roomResponses);
     }
 
-    public record AccommodationResponse(Long id, String name, String address, String description, List<RoomResponse> rooms) {
+    public record AccommodationResponse(Long id, String name, String address, String description, String imageUrl, List<RoomResponse> rooms) {
     }
 
-    public record RoomResponse(Long id, String name, int capacity, long basePrice,
+    public record RoomResponse(Long id, String name, int capacity, long basePrice, String imageUrl,
                                Map<LocalDate, Integer> availabilityByDate) {
     }
 }

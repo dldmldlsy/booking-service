@@ -50,12 +50,14 @@ public class AccommodationService {
     @Transactional
     void seedIfEmpty() {
         if (accommodationRepository.count() > 0) return;
-        Accommodation seoulStay = accommodationRepository.save(new Accommodation("Seoul Stay", "Seoul", "도심 접근성 좋은 숙소"));
-        Accommodation busanBay = accommodationRepository.save(new Accommodation("Busan Bay", "Busan", "해변 근처 숙소"));
+        Accommodation seoulStay = accommodationRepository.save(
+                new Accommodation("Seoul Stay", "Seoul", "도심 접근성 좋은 숙소", "https://example.com/seoul.jpg"));
+        Accommodation busanBay = accommodationRepository.save(
+                new Accommodation("Busan Bay", "Busan", "해변 근처 숙소", "https://example.com/busan.jpg"));
 
-        Room seoulTwin = roomRepository.save(new Room(seoulStay, "Twin Room", 2, new BigDecimal("90000")));
-        Room seoulSuite = roomRepository.save(new Room(seoulStay, "Suite", 4, new BigDecimal("150000")));
-        Room busanOcean = roomRepository.save(new Room(busanBay, "Ocean View", 3, new BigDecimal("120000")));
+        Room seoulTwin = roomRepository.save(new Room(seoulStay, "Twin Room", 2, new BigDecimal("90000"), "https://example.com/seoul-twin.jpg"));
+        Room seoulSuite = roomRepository.save(new Room(seoulStay, "Suite", 4, new BigDecimal("150000"), "https://example.com/seoul-suite.jpg"));
+        Room busanOcean = roomRepository.save(new Room(busanBay, "Ocean View", 3, new BigDecimal("120000"), "https://example.com/busan-ocean.jpg"));
 
         LocalDate today = LocalDate.now();
         for (int i = 0; i < 5; i++) {
@@ -100,7 +102,8 @@ public class AccommodationService {
         if (request.address() == null || request.address().isBlank()) {
             throw new IllegalArgumentException("address is required");
         }
-        Accommodation accommodation = accommodationRepository.save(new Accommodation(request.name(), request.address(), request.description()));
+        Accommodation accommodation = accommodationRepository.save(
+                new Accommodation(request.name(), request.address(), request.description(), request.imageUrl()));
 
         if (request.rooms() != null) {
             request.rooms().forEach(roomRequest -> createRoom(accommodation, roomRequest));
@@ -181,7 +184,7 @@ public class AccommodationService {
     }
 
     private Room createRoom(Accommodation accommodation, CreateRoomRequest request) {
-        Room savedRoom = roomRepository.save(new Room(accommodation, request.name(), request.capacity(), request.basePrice()));
+        Room savedRoom = roomRepository.save(new Room(accommodation, request.name(), request.capacity(), request.basePrice(), request.imageUrl()));
         if (request.availabilityByDate() != null) {
             request.availabilityByDate().forEach((date, count) ->
                     availabilityRepository.save(new Availability(savedRoom, date, count)));
@@ -230,6 +233,7 @@ public class AccommodationService {
             @NotBlank String name,
             @NotBlank String address,
             String description,
+            String imageUrl,
             List<CreateRoomRequest> rooms) {
     }
 
@@ -237,6 +241,7 @@ public class AccommodationService {
             @NotBlank String name,
             @Positive int capacity,
             @PositiveOrZero BigDecimal basePrice,
+            String imageUrl,
             Map<LocalDate, Integer> availabilityByDate) {
     }
 }

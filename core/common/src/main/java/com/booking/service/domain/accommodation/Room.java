@@ -59,6 +59,11 @@ public class Room {
         this.basePrice = basePrice;
     }
 
+    public Room(Accommodation accommodation, String name, int capacity, BigDecimal basePrice, String imageUrl) {
+        this(accommodation, name, capacity, basePrice);
+        this.imageUrl = imageUrl;
+    }
+
     public Room(Accommodation accommodation,
                 String name,
                 int capacity,

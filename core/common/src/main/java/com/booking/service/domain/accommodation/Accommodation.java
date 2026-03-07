@@ -74,6 +74,11 @@ public class Accommodation {
         this.description = description == null ? "" : description;
     }
 
+    public Accommodation(String name, String address, String description, String imageUrl) {
+        this(name, address, description);
+        this.imageUrl = imageUrl;
+    }
+
     public Accommodation(String name,
                          String address,
                          String description,

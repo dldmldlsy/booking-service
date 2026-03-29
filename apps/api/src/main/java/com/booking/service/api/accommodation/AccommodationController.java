@@ -1,9 +1,12 @@
 package com.booking.service.api.accommodation;
 
 import com.booking.service.domain.accommodation.Accommodation;
+import com.booking.service.domain.accommodation.AccommodationCategory;
 import com.booking.service.domain.accommodation.Availability;
 import com.booking.service.domain.accommodation.Room;
+import com.booking.service.domain.accommodation.RoomType;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -109,18 +112,59 @@ public class AccommodationController {
                         room.getName(),
                         room.getCapacity(),
                         room.getBasePrice().longValue(),
-                        room.getImageUrl(),
+                        room.getRoomType(),
+                        room.getDescription(),
+                        room.getMaxHeadCount(),
+                        room.getCheckInTime(),
+                        room.getCheckOutTime(),
+                        room.getThumbnailUrl(),
                         availabilityByRoom.getOrDefault(room.getId(), List.of()).stream()
                                 .collect(Collectors.toMap(Availability::getDate, Availability::getAvailableCount))
                 ))
                 .toList();
-        return new AccommodationResponse(acc.getId(), acc.getName(), acc.getAddress(), acc.getDescription(), acc.getImageUrl(), roomResponses);
+        return new AccommodationResponse(
+                acc.getId(),
+                acc.getName(),
+                acc.getAddress(),
+                acc.getDescription(),
+                acc.getPhoneNumber(),
+                acc.getLatitude(),
+                acc.getLongitude(),
+                acc.getRegion(),
+                acc.getCategory(),
+                acc.getCheckInTime(),
+                acc.getCheckOutTime(),
+                acc.getMaximumCapacity(),
+                acc.getLowestPrice() == null ? null : acc.getLowestPrice().longValue(),
+                acc.getThumbnailUrl(),
+                roomResponses);
     }
 
-    public record AccommodationResponse(Long id, String name, String address, String description, String imageUrl, List<RoomResponse> rooms) {
+    public record AccommodationResponse(
+            Long id,
+            String name,
+            String address,
+            String description,
+            String phoneNumber,
+            Double latitude,
+            Double longitude,
+            String region,
+            AccommodationCategory category,
+            LocalTime checkInTime,
+            LocalTime checkOutTime,
+            Integer maximumCapacity,
+            Long lowestPrice,
+            String thumbnailUrl,
+            List<RoomResponse> rooms) {
     }
 
-    public record RoomResponse(Long id, String name, int capacity, long basePrice, String imageUrl,
+    public record RoomResponse(Long id, String name, int capacity, long basePrice,
+                               RoomType roomType,
+                               String description,
+                               Integer maxHeadCount,
+                               LocalTime checkInTime,
+                               LocalTime checkOutTime,
+                               String thumbnailUrl,
                                Map<LocalDate, Integer> availabilityByDate) {
     }
 }

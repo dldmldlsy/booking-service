@@ -1,8 +1,10 @@
 package com.booking.service.api.accommodation;
 
 import com.booking.service.domain.accommodation.Accommodation;
+import com.booking.service.domain.accommodation.AccommodationCategory;
 import com.booking.service.domain.accommodation.Availability;
 import com.booking.service.domain.accommodation.Room;
+import com.booking.service.domain.accommodation.RoomType;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +12,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -51,13 +54,46 @@ public class AccommodationService {
     void seedIfEmpty() {
         if (accommodationRepository.count() > 0) return;
         Accommodation seoulStay = accommodationRepository.save(
-                new Accommodation("Seoul Stay", "Seoul", "도심 접근성 좋은 숙소", "https://example.com/seoul.jpg"));
+                new Accommodation(
+                        "Seoul Stay",
+                        "Seoul",
+                        "도심 접근성 좋은 숙소",
+                        "010-0000-0000",
+                        37.5665,
+                        126.9780,
+                        "서울",
+                        AccommodationCategory.HOTEL,
+                        LocalTime.of(15, 0),
+                        LocalTime.of(11, 0),
+                        200,
+                        new BigDecimal("90000"),
+                        "https://example.com/seoul.jpg",
+                        null,
+                        null));
         Accommodation busanBay = accommodationRepository.save(
-                new Accommodation("Busan Bay", "Busan", "해변 근처 숙소", "https://example.com/busan.jpg"));
+                new Accommodation(
+                        "Busan Bay",
+                        "Busan",
+                        "해변 근처 숙소",
+                        "010-1111-2222",
+                        35.1796,
+                        129.0756,
+                        "부산",
+                        AccommodationCategory.PENSION,
+                        LocalTime.of(15, 0),
+                        LocalTime.of(11, 0),
+                        300,
+                        new BigDecimal("80000"),
+                        "https://example.com/busan.jpg",
+                        null,
+                        null));
 
-        Room seoulTwin = roomRepository.save(new Room(seoulStay, "Twin Room", 2, new BigDecimal("90000"), "https://example.com/seoul-twin.jpg"));
-        Room seoulSuite = roomRepository.save(new Room(seoulStay, "Suite", 4, new BigDecimal("150000"), "https://example.com/seoul-suite.jpg"));
-        Room busanOcean = roomRepository.save(new Room(busanBay, "Ocean View", 3, new BigDecimal("120000"), "https://example.com/busan-ocean.jpg"));
+        Room seoulTwin = roomRepository.save(new Room(seoulStay, "Twin Room", 2, new BigDecimal("90000"), RoomType.TWIN,
+                "아늑한 트윈룸", 2, LocalTime.of(15, 0), LocalTime.of(11, 0), "https://example.com/seoul-twin.jpg"));
+        Room seoulSuite = roomRepository.save(new Room(seoulStay, "Suite", 4, new BigDecimal("150000"), RoomType.SUITE,
+                "가족용 스위트", 4, LocalTime.of(15, 0), LocalTime.of(11, 0), "https://example.com/seoul-suite.jpg"));
+        Room busanOcean = roomRepository.save(new Room(busanBay, "Ocean View", 3, new BigDecimal("120000"), RoomType.DELUXE,
+                "오션뷰 객실", 3, LocalTime.of(15, 0), LocalTime.of(11, 0), "https://example.com/busan-ocean.jpg"));
 
         LocalDate today = LocalDate.now();
         for (int i = 0; i < 5; i++) {
@@ -102,8 +138,31 @@ public class AccommodationService {
         if (request.address() == null || request.address().isBlank()) {
             throw new IllegalArgumentException("address is required");
         }
+        validateAccommodationTimes(request.checkInTime(), request.checkOutTime());
+        if (request.maximumCapacity() != null && request.maximumCapacity() <= 0) {
+            throw new IllegalArgumentException("maximumCapacity must be positive");
+        }
+        if (request.lowestPrice() != null && request.lowestPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("lowestPrice must be >= 0");
+        }
+
         Accommodation accommodation = accommodationRepository.save(
-                new Accommodation(request.name(), request.address(), request.description(), request.imageUrl()));
+                new Accommodation(
+                        request.name(),
+                        request.address(),
+                        request.description(),
+                        request.phoneNumber(),
+                        request.latitude(),
+                        request.longitude(),
+                        request.region(),
+                        request.category(),
+                        request.checkInTime(),
+                        request.checkOutTime(),
+                        request.maximumCapacity(),
+                        request.lowestPrice(),
+                        request.thumbnailUrl(),
+                        null,
+                        null));
 
         if (request.rooms() != null) {
             request.rooms().forEach(roomRequest -> createRoom(accommodation, roomRequest));
@@ -184,7 +243,18 @@ public class AccommodationService {
     }
 
     private Room createRoom(Accommodation accommodation, CreateRoomRequest request) {
-        Room savedRoom = roomRepository.save(new Room(accommodation, request.name(), request.capacity(), request.basePrice(), request.imageUrl()));
+        validateRoomRequest(request);
+        Room savedRoom = roomRepository.save(new Room(
+                accommodation,
+                request.name(),
+                request.capacity(),
+                request.basePrice(),
+                request.roomType(),
+                request.description(),
+                request.maxHeadCount(),
+                request.checkInTime(),
+                request.checkOutTime(),
+                request.thumbnailUrl()));
         if (request.availabilityByDate() != null) {
             request.availabilityByDate().forEach((date, count) ->
                     availabilityRepository.save(new Availability(savedRoom, date, count)));
@@ -233,7 +303,16 @@ public class AccommodationService {
             @NotBlank String name,
             @NotBlank String address,
             String description,
-            String imageUrl,
+            String phoneNumber,
+            Double latitude,
+            Double longitude,
+            String region,
+            AccommodationCategory category,
+            LocalTime checkInTime,
+            LocalTime checkOutTime,
+            Integer maximumCapacity,
+            BigDecimal lowestPrice,
+            String thumbnailUrl,
             List<CreateRoomRequest> rooms) {
     }
 
@@ -241,7 +320,28 @@ public class AccommodationService {
             @NotBlank String name,
             @Positive int capacity,
             @PositiveOrZero BigDecimal basePrice,
-            String imageUrl,
+            RoomType roomType,
+            String description,
+            Integer maxHeadCount,
+            LocalTime checkInTime,
+            LocalTime checkOutTime,
+            String thumbnailUrl,
             Map<LocalDate, Integer> availabilityByDate) {
+    }
+
+    private void validateAccommodationTimes(LocalTime checkIn, LocalTime checkOut) {
+        if (checkIn != null && checkOut != null && !checkIn.isBefore(checkOut)) {
+            throw new IllegalArgumentException("checkInTime must be before checkOutTime");
+        }
+    }
+
+    private void validateRoomRequest(CreateRoomRequest request) {
+        if (request.maxHeadCount() != null && request.maxHeadCount() < request.capacity()) {
+            throw new IllegalArgumentException("maxHeadCount must be >= capacity");
+        }
+        if (request.checkInTime() != null && request.checkOutTime() != null &&
+                !request.checkInTime().isBefore(request.checkOutTime())) {
+            throw new IllegalArgumentException("room checkInTime must be before checkOutTime");
+        }
     }
 }

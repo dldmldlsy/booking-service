@@ -2,6 +2,8 @@ package com.booking.service.domain.accommodation;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -34,6 +36,10 @@ public class Room {
     @Column(nullable = false)
     private BigDecimal basePrice;
 
+    @Enumerated(EnumType.STRING)
+    @Column
+    private RoomType roomType;
+
     @Column
     private String description;
 
@@ -47,38 +53,40 @@ public class Room {
     private LocalTime checkOutTime;
 
     @Column
-    private String imageUrl;
+    private String thumbnailUrl;
 
     protected Room() {
     }
 
-    public Room(Accommodation accommodation, String name, int capacity, BigDecimal basePrice) {
+    public Room(Accommodation accommodation, String name, int capacity, BigDecimal basePrice, RoomType roomType) {
         this.accommodation = accommodation;
         this.name = name;
         this.capacity = capacity;
         this.basePrice = basePrice;
+        this.roomType = roomType;
     }
 
-    public Room(Accommodation accommodation, String name, int capacity, BigDecimal basePrice, String imageUrl) {
-        this(accommodation, name, capacity, basePrice);
-        this.imageUrl = imageUrl;
+    public Room(Accommodation accommodation, String name, int capacity, BigDecimal basePrice, RoomType roomType, String thumbnailUrl) {
+        this(accommodation, name, capacity, basePrice, roomType);
+        this.thumbnailUrl = thumbnailUrl;
     }
 
     public Room(Accommodation accommodation,
                 String name,
                 int capacity,
                 BigDecimal basePrice,
+                RoomType roomType,
                 String description,
                 Integer maxHeadCount,
                 LocalTime checkInTime,
                 LocalTime checkOutTime,
-                String imageUrl) {
-        this(accommodation, name, capacity, basePrice);
+                String thumbnailUrl) {
+        this(accommodation, name, capacity, basePrice, roomType);
         this.description = description;
         this.maxHeadCount = maxHeadCount;
         this.checkInTime = checkInTime;
         this.checkOutTime = checkOutTime;
-        this.imageUrl = imageUrl;
+        this.thumbnailUrl = thumbnailUrl;
     }
 
     public Long getId() {
@@ -101,6 +109,10 @@ public class Room {
         return basePrice;
     }
 
+    public RoomType getRoomType() {
+        return roomType;
+    }
+
     public String getDescription() {
         return description;
     }
@@ -117,7 +129,7 @@ public class Room {
         return checkOutTime;
     }
 
-    public String getImageUrl() {
-        return imageUrl;
+    public String getThumbnailUrl() {
+        return thumbnailUrl;
     }
 }

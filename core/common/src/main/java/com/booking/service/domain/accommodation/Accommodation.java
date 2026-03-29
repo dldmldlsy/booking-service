@@ -2,6 +2,8 @@ package com.booking.service.domain.accommodation;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -41,8 +43,9 @@ public class Accommodation {
     @Column
     private String region;
 
+    @Enumerated(EnumType.STRING)
     @Column
-    private String category;
+    private AccommodationCategory category;
 
     @Column
     private LocalTime checkInTime;
@@ -57,7 +60,7 @@ public class Accommodation {
     private BigDecimal lowestPrice;
 
     @Column
-    private String imageUrl;
+    private String thumbnailUrl;
 
     @Column
     private LocalDateTime createdAt;
@@ -74,9 +77,9 @@ public class Accommodation {
         this.description = description == null ? "" : description;
     }
 
-    public Accommodation(String name, String address, String description, String imageUrl) {
+    public Accommodation(String name, String address, String description, String thumbnailUrl) {
         this(name, address, description);
-        this.imageUrl = imageUrl;
+        this.thumbnailUrl = thumbnailUrl;
     }
 
     public Accommodation(String name,
@@ -86,12 +89,12 @@ public class Accommodation {
                          Double latitude,
                          Double longitude,
                          String region,
-                         String category,
+                         AccommodationCategory category,
                          LocalTime checkInTime,
                          LocalTime checkOutTime,
                          Integer maximumCapacity,
                          BigDecimal lowestPrice,
-                         String imageUrl,
+                         String thumbnailUrl,
                          LocalDateTime createdAt,
                          LocalDateTime updatedAt) {
         this(name, address, description);
@@ -104,7 +107,7 @@ public class Accommodation {
         this.checkOutTime = checkOutTime;
         this.maximumCapacity = maximumCapacity;
         this.lowestPrice = lowestPrice;
-        this.imageUrl = imageUrl;
+        this.thumbnailUrl = thumbnailUrl;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -141,7 +144,7 @@ public class Accommodation {
         return region;
     }
 
-    public String getCategory() {
+    public AccommodationCategory getCategory() {
         return category;
     }
 
@@ -161,8 +164,8 @@ public class Accommodation {
         return lowestPrice;
     }
 
-    public String getImageUrl() {
-        return imageUrl;
+    public String getThumbnailUrl() {
+        return thumbnailUrl;
     }
 
     public LocalDateTime getCreatedAt() {
